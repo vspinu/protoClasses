@@ -20,15 +20,16 @@ options(protoClasses = list(
              contains = "list")
     setClass("formInfo",
              representation(formClass = "character"),
-             prototype = (formClass = "protoForm")) # add host protoObject?
+             prototype(formClass = "protoForm")) # add host protoObject?
     setClass("protoFunction",
              representation(changeCallEnv = "logical",
-                            documentation = "character"),
+                            doc = "character"),
              prototype(changeCallEnv = FALSE),
              contains = "function")
     setClass("protoMethod",
              representation(bindName = "character",
                             container = "character"),
+             ## todo: change to typeContainer
              prototype(container = ".methods"),
              contains = "protoFunction")
     setClass("protoField",
@@ -46,18 +47,19 @@ options(protoClasses = list(
              contains = "expression")
     setClass("protoFormWithEnv",
              representation(environment = "environment"),
-             contains = "protoForm") ## used for printing $ methods returns this object with environment slot being the .self
+             contains = "protoForm") ## used for printing, $ methods returns this object with environment slot set to .self
     setClass("protoFormWithBrowser",
              representation(original = "protoForm",
                             hostEnv = "environment",
                             isInHost = "logical"),
              contains = "protoForm")
+
 ###_ METHODS
     ## elements of a form are guarantied to be named
     setAs("ANY", "protoForm",
-          as.form
-          )
+          as.form)  ## todo: qualify as.pbm.sexp
     setAs("expression", "protoForm",
+          ## why  .makeNames here? new have to create them todo:
           function(from){
               names <- .makeNames(allNames(from))
               new("protoForm", from, names = names)
@@ -71,12 +73,14 @@ options(protoClasses = list(
     setMethod("initialize", "protoForm",
               function(.Object, ...){
                   .Object <- callNextMethod()
+                  ## forms always have names!!
                   names(.Object) <- .makeNames(allNames(.Object))
                   .Object
               })
     setMethod("[",
               signature(x = "protoForm"),
               function (x, i, j, ..., drop = TRUE){
+                  ## why [ strips class in the first place todo:
                   as(callNextMethod(), "protoForm")
           })
 
@@ -107,6 +111,8 @@ options(protoClasses = list(
     setGeneric("installBinding",
                def = function(bindInfo, where, bindName, container = ".cells", ...) standardGeneric("installBinding"),
                useAsDefault = .installBinding_default)
+    ## todo: change to protoCellInfo,protoFormInfo etc
+    ## for other Infos default binding is ok? :todo
     setMethod("installBinding", "cellInfo",
               .installBinding_cellInfo)
     setMethod("installBinding", "protoCell",
@@ -138,13 +144,14 @@ options(protoClasses = list(
               .initializeRoot_protoCell)
     setMethod("initializeRoot", "protoContext",
               .initializeRoot_protoContext)
+
 ###__ setAs
     setAs("environment", "envProtoClass", function(from){
         from <- callNextMethod()
         print("COOOl")
         from
-        }
-          )
+    })
+
 ###__ SHOW
     setMethod("show", signature(object = "protoContext"),
               .show_Context)
@@ -157,6 +164,7 @@ options(protoClasses = list(
     setMethod("print", signature(x = "protoFormWithEnv"),
               .print_ProtoFormWithEnv)
     ## protoContext and all inhereted protoContext classes are defined by contextClassRepresentation
+
 ###__ CLONE
     setGeneric("clone",
                def = function(x, ...) standardGeneric("clone"),
@@ -201,6 +209,7 @@ options(protoClasses = list(
              contains = "classRepresentation")
     setMethod("show", "contextClassRepresentation",
               function(object) .show_ContextClassDef(object))
+
 ###_ CLASS DEFINITIONS and default COERCION and REPLACEMENT methods
     assignClassDef("envProtoClass", .modifyAs(getClassDef("envProtoClass")))
     assignClassDef("protoCell",
@@ -278,7 +287,7 @@ setContextClass <- function(Class,
 ### Rely only on internal implementation.
 ### Always use as.environment (do not rely on [[]], or other user changeable methods)
 ### All this funcs start with .
-### Do not rely on  objects methods (like $, methods, etk) (only func programming)
+### Do not rely on  objects methods (like $, methods, etc) (only func programming)
 
 ###_* META NAMES
 .rootMetaName <- ".|.root"
@@ -911,7 +920,6 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
 }
 
 ###_  * GETTERS
-
 .existsMethod <- function(name, selfEnv){
     exists(name, envir = selfEnv[[".methods"]])
 }
@@ -1015,7 +1023,6 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
 .setCell <- function(x, name, value){}
 
 ###_ * KILLERS
-
 .removeFormWithChildren <- function(name, selfEnv){
     "removes recursively registred forms.
 If name is aa.bb all the registered forms starting with aa.bb (inclusive) will
@@ -1267,7 +1274,6 @@ protoField <- function(...)
 }
 
 ###_ + CELLS
-
 setGeneric("setPrototype",
            def = function(protoObj, prototype) standardGeneric("setPrototype"),
            useAsDefault =
