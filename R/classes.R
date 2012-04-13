@@ -164,6 +164,7 @@ setMethod("clone", "cellContainer",
           .clone_cellContainer)
 setMethod("clone", "protoContext",
           .clone_protoContext)
+
 ###__ DOLLAR
 setMethod("$",
           signature(x = "envProtoClass"),
@@ -186,32 +187,35 @@ setMethod("$<-",
 ## Extension of classRepresentation to store two new slots: defaultContext and
 ## classDef. each new protoContext class generates new classDef with it's
 ## default context.
+assignClassDef("envProtoClass", .modifyAs(getClassDef("envProtoClass")))
 
+###__ contextClassRepresentation
 setClass("contextClassRepresentation",
          representation(defaultContext = "protoContext",
                         cellClass = "character"),
          prototype = list(cellClass = "protoCell"),
          contains = "classRepresentation")
 
+setMethod("show", "contextClassRepresentation",
+          function(object) .show_ContextClassDef(object))
 
+assignClassDef("protoContext",
+               .modifyAs(new("contextClassRepresentation", getClassDef("protoContext") ,
+                             defaultContext = newRoot("protoContext", type = "@", isDefaultContext = TRUE))
+                         ))
+
+###__ cellClassRepresentation
 setClass("cellClassRepresentation",
          representation(contextClass = "character"),
          ## really need it?
          prototype = list(contextClass = "protoContext"),
          contains = "classRepresentation")
 
-setMethod("show", "contextClassRepresentation",
-          function(object) .show_ContextClassDef(object))
-
-###_ CLASS DEFINITIONS and default COERCION and REPLACEMENT methods
-assignClassDef("envProtoClass", .modifyAs(getClassDef("envProtoClass")))
 assignClassDef("protoCell",
-               .modifyAs(new("cellClassRepresentation", getClassDef("protoCell")))
-               )
-assignClassDef("protoContext",
-               .modifyAs(new("contextClassRepresentation", getClassDef("protoContext") ,
-                             defaultContext = newRoot("protoContext", type = "@", isDefaultContext = TRUE))
-                         ))
+               .modifyAs(new("cellClassRepresentation", getClassDef("protoCell"))))
+
+
+
 ## Install the super-root cell in the super - root default context
 getClassDef("protoContext")@defaultContext$initCells(`*` = newRoot("protoCell"))
 invisible(NULL)
