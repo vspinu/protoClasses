@@ -1092,25 +1092,6 @@ protoField <- function(...)
 }
 
 ###_ + CELLS
-setGeneric("setPrototype",
-           def = function(protoObj, prototype) standardGeneric("setPrototype"),
-           useAsDefault =
-           function(protoObj, prototype){
-               assign(".prototype", prototype, envir = protoObj)
-               parent.env(protoObj) <- prototype
-               .fields <- get(".fields", envir = protoObj)
-               parent.env(.fields) <- get(".fields", envir = prototype)
-               .forms <- get(".forms", envir = protoObj)
-               parent.env(.forms) <- get(".forms", envir = prototype)
-               .methods <- get(".methods", envir = protoObj)
-               parent.env(.methods) <- get(".methods", envir = prototype)
-           })
-
-setMethod("setPrototype", "protoContext",
-          function(protoObj, prototype){
-              callNextMethod()
-              parent.env(get(".cells", envir = protoObj)) <- parent.env(get(".cells", envir = prototype))
-          })
 
 .initCells <- function(cells, where){
     "Install the CELLS in the object WHERE"
@@ -1221,14 +1202,8 @@ setMethod("setPrototype", "protoContext",
             setPrototype(cell, prototype)
     })
 }
-##' .. content for \description{} (no empty lines) ..
-##'
-##' .. content for \details{} ..
-##' @title
-##' @param cellInfo
-##' @param homeContext
-##' @return
-##' @author
+
+
 cellFromInfo <- function(cellInfo, homeContext){
     stopifnot(is(cellInfo, "cellInfo"))
     ## infer name! SIDE EFFECT (does not work here,  this func is called usually  internally)
@@ -1822,8 +1797,6 @@ leafNames <- function(cellContainer){
     .gr
 }
 
-setAs("cellContainer", "graphNEL", .as_cellContainer_graphNEL)
-setAs("protoContext", "graphNEL", .as_cellContainer_graphNEL)
 
 ## gR <- as(M[[".cells"]], "graphNEL")
 ## str(renderGraph(layoutGraph(gR)))
@@ -1889,11 +1862,6 @@ plotCellGraph <-
         renderGraph(x)
         par(old_par)
     }
-
-setMethod("plot", c("protoContext", "missing"),
-          def= plotCellGraph )
-setMethod("plot", c("protoContainer", "ANY"),
-          def = plotCellGraph)
 
 
 ###_* INFO
