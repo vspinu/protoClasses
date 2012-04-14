@@ -139,18 +139,18 @@ newRoot <- function(Class, ...){
                                           initForms = list(),
                                           initFields = list(),
                                           initMethods = list(),
-                                          type = "--",
+                                          type = "*",
                                           ...){ #... not used here pu
     ## initialize the basic functionality for the ROOT object
     ## .fields, .prototype, basic methods etc
-    objEnv <- as.environment(.Object)
+    objEnv <- as.environment(.Object) ## todo: should be base-namespace??
     .signAsRoot(objEnv)
     parent.env(objEnv) <- globalenv()  ## if cell,   will have non empty parent
     ## tothink: lock these fields?
     objEnv[[".fields"]] <- new("protoContainer", typeContainer = ".fields") ## emptyenv as parent by default
     objEnv[[".methods"]] <- new("protoContainer", typeContainer = ".methods")
     objEnv[[".forms"]] <- new("protoContainer", typeContainer = ".forms")
-    .initFields(list(type = "*"), where = objEnv)
+    .initFields(list(type = type), where = objEnv)
     .initMethods(list(
                    initMethods = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
                        if(changeCallEnv){
@@ -209,8 +209,7 @@ newRoot <- function(Class, ...){
     .insertSpecial(objEnv, self = .Object, prototype=NULL)
     objEnv[[".root"]] <- .Object
 
-    ## FIELDS:
-    .setField(objEnv, "type", type)
+    ## "USER" FIELDS:
     .initFields(initFields, .Object)
     .initMethods(initMethods, .Object)
     .initForms(initForms, .Object)
@@ -732,7 +731,7 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
                    setFUN(selfEnv, nm, dots[[nm]]))
             invisible(names)
         }else{
-            stop("Accesor accepts one argument of the class character, or named arguments of the form \"name = value\"")
+            stop("Accessor accepts one argument of the class character, or named arguments of the form \"name = value\"")
         }
     out
 }
@@ -815,7 +814,19 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
     }
 }
 
-.setMethod <- function(x, name, value){}
+.setMethod <- function(x, name, value){
+    .methods <- get(".methods", envir = x)
+    if(exists(name, envir = .methods)){
+        ## oldMeth <- get(name, envir = x) ;; need to compare with an old one really?  probably not
+        if(!is.function(value))
+            stop("Methods must be functions. Not true for '", name, "'")
+        method <- new("protoMethod", value)
+        installBinding(method, x, name, ".methods")
+    }else{
+        stop("Object ", name, " is not a valid method in the protoObject of type \"", get("type", x), "\"")
+    }
+}
+
 .setForm <- function(x, name, value, after = NULL){
     ## after must be a character or position
     .forms <- get(".forms", envir = x)
@@ -1056,10 +1067,8 @@ protoField <- function(...)
 ###_ + METHODS
 .initMethods <- function(methods, where){
     "Install the methods in the object WHERE"
-    ## if no arguments return all names in the hierarchy
-    ## if(length(methods) == 0L)
-    ##     return(sort(.get_all_names(where, ".methods")))
-    ## if list of one element use that element
+    ## methods is an list which is received as dots in the wrapper
+    ## if list of one element which is a list  use that element
     if(length(methods) == 1L && is.list(methods[[1L]]))
         methods <- methods[[1L]]
     if(is.list(methods)) {
@@ -1092,7 +1101,6 @@ protoField <- function(...)
 }
 
 ###_ + CELLS
-
 .initCells <- function(cells, where){
     "Install the CELLS in the object WHERE"
     ## cells must be a list,  names(cells) have precedence over internal type
@@ -1446,25 +1454,26 @@ areIdenticalPBM <- function(pbm1, pbm2){
         no.list = TRUE)
 }
 
+
 .show_EnvProtoObject <- function(object){
     callNextMethod()
     ## Show the context in the future  here (todo)
     objEnv <- as.environment(object)
     cat(" Type: \"", .type(object), "\"\n", sep = "")
-    methods:::.printNames("All objects: ", ls(objEnv , all.names = TRUE))
+    methods:::.printNames("All objects: ", ls(objEnv, all.names = TRUE))
     methods:::.printNames("Is Root: ", isRoot(object))
+    bar <- "\t  --------------------------------  \n"
     cat(" Containers:\n")
-    cat(" \nFields: \n")
-    print(ls(objEnv[[".fields"]], all = TRUE))
+    cat(" \n+ Fields:", bar)
+    str(.get_all_names_with_host(".fields", objEnv))
     ## print(.infoContainer(.get_all_names(objEnv[[".fields"]]), objEnv, ".fields"))
-    cat(" \nMethods: \n")
-    print(ls(objEnv[[".methods"]], all = TRUE))
+    cat(" \n+ Methods:", bar)
+    str(.get_all_names_with_host(".methods", objEnv))
     ## print(.infoContainer(.get_all_names(objEnv[[".methods"]]), objEnv, ".methods"))
-    cat(" \nForms: \n")
-    print(ls(objEnv[[".forms"]], all = TRUE))
+    cat(" \n+ Forms:", bar)
+    str(.get_all_names_with_host(".forms", objEnv))
     ## for forms look in objEnv directly:
     ## print(.infoForms(objEnv))
-
     ## str(list(Fields =  .get_all_names(objEnv[[".fields"]]),
     ##          Methods = .get_all_names(objEnv[[".methods"]]),
     ##          Forms = .get_all_names(objEnv[[".forms"]])),
@@ -1474,10 +1483,13 @@ areIdenticalPBM <- function(pbm1, pbm2){
     ## methods:::.printNames("Forms: ", ls(objEnv[[".forms"]], all.names = TRUE))
 }
 
+
 .show_Context <- function(object){
     callNextMethod()
     objEnv <- as.environment(object)
-    cat("\nCells: \n")
+    bar <- "\t --------------------------------  \n"
+    cat("\n+ Cells:", bar)
+    str(.get_all_names_with_host(".cells", objEnv))
     cell_names <- ls(objEnv[[".cells"]], all.names = TRUE)
     rev_names <- strsplit(cell_names, ".", fixed = TRUE)
     rev_names <- sapply(rev_names, function(el) paste(rev(el), collapse = "."))
@@ -1707,6 +1719,26 @@ Return NULL if trigger_error = FALSE and match not found."
     }
     unique(all_names)
 }
+
+
+.get_all_names_with_host <- function(container, host){
+    "Search recursively for names in 'container', return a list of the form
+list(typeA = c('foo', 'bar'), typeB = ...)"
+    host <- as.environment(host)
+    if(is.character(container))
+        container <- host[[container]]
+    containerEnv <- as.environment(container)
+    all_names <- list()
+    while(!identical(containerEnv, emptyenv())){
+        all_names[[host[["type"]]]] <- ls(containerEnv, all.names = TRUE)
+        containerEnv <- parent.env(containerEnv)
+        host <- as.environment(host)[[".prototype"]]
+    }
+    all_names
+}
+
+
+
 
 .infer_type_cell <- function(cell){
     " looks in the .type field if that is --, returns the symbol cell,

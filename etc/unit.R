@@ -1,7 +1,27 @@
 source("../R/funcs.R")
 source("../R/classes.R")
 
-X <- new("protoContext")
+## working with contexts
+(X <- protoContext())
+(Y <- protoContext(type="Y", X))
+X$type <- "343"
+Y$type
+Y$forms
+
+## METHODS:
+names(X$methods())
+names(X$methods(c("expr", "initMethods")))
+names(X$methods("expr", "initMethods")) ## error todo: not consistent with name = value interface
+
+X$initMethods(mymeth = function(a, b) a + b)
+names(Y$methods())
+Y$mymeth(34, 43)
+Y$methods(mymeth = function(a, b) a/b)
+Y$mymeth(34, 43)
+X$mymeth(34, 43)
+Y$initMethods(mymeth = NULL) ## clean the methods
+Y$mymeth(34, 43)
+
 X
 x <- new("protoCell", prot = "*", type = "x", expr = {appp <- 232323})
 y <- new("protoCell", prototype = x, type = "y")

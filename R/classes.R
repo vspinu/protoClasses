@@ -1,9 +1,11 @@
-removeMethod("initialize", "envProtoClass")
-removeMethod("initialize", "protoCell")
-removeMethod("initialize", "protoContext")
-removeMethod("initialize", "protoContainer")
+if(existsMethod("initialize", "envProtoClass"))
+    removeMethod("initialize", "envProtoClass")
+if(existsMethod("initialize", "protoContext"))
+    removeMethod("initialize", "protoContext")
+if(existsMethod("initialize", "protoCell"))
+    removeMethod("initialize", "protoCell")
 
-###_ GENERIC METHODS
+###_ GENERIC METHODS:
 setGeneric("installBinding",
            def = function(bindInfo, where, bindName, container = ".cells", ...) standardGeneric("installBinding"),
            useAsDefault = .installBinding_default)
@@ -13,9 +15,9 @@ setGeneric("clone",
            useAs = function(x, ...) x)
 
 
-###_ FUNDAMENTAL OBJECTS
+###_ FUNDAMENTAL OBJECTS:
 
-###__ INFO
+###__ INFO:
 ## todo: change to protoCellInfo,protoFormInfo etc
 ## for other Infos default binding is ok? :todo
 
@@ -33,11 +35,9 @@ setMethod("installBinding", "cellInfo",
 setClass("formInfo",
          representation(formClass = "character"),
          prototype(formClass = "protoForm")) # add host protoObject?
-setMethod("installBinding", "protoForm",
-          .installBinding_protoForm)
 
 
-###__ CORE
+###__ CORE:
 setClass("protoFunction",
          representation(changeCallEnv = "logical",
                         doc = "character"),
@@ -73,6 +73,8 @@ setClass("protoForm",
          ## cell = "environment"),
          contains = "expression")
 
+setMethod("installBinding", "protoForm",
+          .installBinding_protoForm)
 setAs("ANY", "protoForm",
       as.form)  ## todo: qualify as.pbm.sexp
 setAs("expression", "protoForm",
@@ -116,14 +118,10 @@ setClass("protoFormWithBrowser",
                         isInHost = "logical"),
          contains = "protoForm")
 
-###_ METHODS
-## elements of a form are guarantied to be named
 
-###_ PROTO
+###_ PROTO:
 ###__ envProtoClass
 setClass("envProtoClass", contains = "environment")
-setMethod("initialize", signature(.Object = "envProtoClass"),
-          .initialize_envProtoClass)
 setMethod("initializeRoot", "envProtoClass",
           .initializeRoot_envProtoClass)
 setAs("environment", "envProtoClass", function(from){
@@ -146,8 +144,28 @@ setMethod("$<-",
 
 ###__ protoContext
 setClass("protoContext", contains = "envProtoClass")
-setMethod("initialize", signature(.Object = "protoContext"),
-          .initialize_protoContext)
+protoContext <- function(
+                  type = "--",
+                  prototype = NULL,
+                  fields = list(),
+                  methods = list(),
+                  forms = list(),
+                  cells = list(),
+                  initFields = list(),
+                  initMethods = list(),
+                  initForms = list(),
+                  initCells = list(),
+                  expr = expression(),
+                  rootParentEnv = NULL, ## todo:  make field
+                  ...){
+    new("protoContext", type = type, prototype = prototype,
+        initCells = initCells, cells = cells,
+        initMethods = initMethods, methods = methods,
+        initFields = initFields, fields = fields,
+        initForms = initForms, forms = forms,
+        expr = expr, ...)}
+
+
 setMethod("initializeRoot", "protoContext",
           .initializeRoot_protoContext)
 setMethod("show", signature(object = "protoContext"),
@@ -163,14 +181,14 @@ setMethod("$<-",
           definition = .dollarSet_protoContext
           )
 
+
+
 ###__ protoCell
 setClass("protoCell",
          ## representation =
          ## list(contextClass = "character"),
          ## prototype = list(contextClass = "protoContext"),
          contains = "envProtoClass")
-setMethod("initialize", signature(.Object = "protoCell"),
-          .initialize_protoCell)
 setMethod("initializeRoot", "protoCell",
           .initializeRoot_protoCell)
 
@@ -192,7 +210,7 @@ setMethod("initialize", signature(.Object = "protoContainer"),
 setMethod("clone", "protoContainer",
           .clone_protoContainer)
 
-###___ cellContainer
+###__ cellContainer
 setClass("cellContainer",
          prototype = prototype(typeContainer = ".cells"),
          contains = "protoContainer")
@@ -234,7 +252,16 @@ assignClassDef("protoCell",
 getClassDef("protoContext")@defaultContext$initCells(`*` = newRoot("protoCell"))
 invisible(NULL)
 
-###_ MISC
+###_ INITIALIZE:
+## (really should be at the end)
+setMethod("initialize", signature(.Object = "envProtoClass"),
+          .initialize_envProtoClass)
+setMethod("initialize", signature(.Object = "protoContext"),
+          .initialize_protoContext)
+setMethod("initialize", signature(.Object = "protoCell"),
+          .initialize_protoCell)
+
+###_ MISC:
 setGeneric("setPrototype",
            def = function(protoObj, prototype) standardGeneric("setPrototype"),
            useAsDefault =
@@ -254,6 +281,8 @@ setMethod("setPrototype", "protoContext",
               callNextMethod()
               parent.env(get(".cells", envir = protoObj)) <- parent.env(get(".cells", envir = prototype))
           })
+
+
 
 
 ## Rgraphvis functionality
