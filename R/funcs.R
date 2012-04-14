@@ -152,53 +152,59 @@ newRoot <- function(Class, ...){
     objEnv[[".forms"]] <- new("protoContainer", typeContainer = ".forms")
     .initFields(list(type = type), where = objEnv)
     .initMethods(list(
-                   initMethods = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       if(changeCallEnv){
-                           dots <- eval(substitute(list(...)), envir = .self)
-                           .initMethods(dots, .self)
-                       }else{
-                           .initMethods(list(...), .self)
-                       }
+                   initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                       dots <-
+                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                           else  c(list(...), .list)
+                       .initMethods(dots, .self)
+                   },
+                   setMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                       dots <-
+                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                           else c(list(...), .list)
+                       .generic_setter(dots, .self, ".methods")
                    },
                    initFields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv) {
-                       if(changeCallEnv){
-                           dots <- eval(substitute(list(...)), envir = .self)
-                           .initFields(dots, .self)
-                       }else{
-                           .initFields(list(...), .self)
-                       }
+                       dots <-
+                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+                           else  list(...)
+                       .initFields(dots, .self)
+                   },
+                   setFields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                       dots <-
+                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+                           else list(...)
+                       .generic_setter(dots, .self, ".fields")
                    },
                    initForms = function(..., after = NULL, changeCallEnv = getOption("protoClasses")$changeCallEnv) {
-                       if(changeCallEnv){
-                           dots <- eval(substitute(list(...)), envir = .self)
-                           .initForms(dots, .self, after = after)
-                       }else{
-                           .initForms(list(...), .self, after = after)
-                       }
+                       dots <-
+                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+                           else  list(...)
+                       .initForms(dots, .self, after = after)
+                   },
+                   setForms = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                       dots <-
+                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+                           else list(...)
+                       .generic_setter(dots, .self, ".forms")
                    },
                    methods = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       if(changeCallEnv){
-                           dots <- eval(substitute(list(...)), envir = .self)
-                           .generic_accessor(dots, .self, ".methods")
-                       }else{
-                           .generic_accessor(list(...), .self, ".methods")
-                       }
+                       dots <-
+                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+                           else  list(...)
+                       .generic_getter(dots, .self, ".methods")
                    },
                    fields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       if(changeCallEnv){
-                           dots <- eval(substitute(list(...)), envir = .self)
-                           .generic_accessor(dots, .self, ".fields")
-                       }else{
-                           .generic_accessor(list(...), .self, ".fields")
-                       }
+                       dots <-
+                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+                           else  list(...)
+                       .generic_getter(dots, .self, ".fields")
                    },
                    forms = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       if(changeCallEnv){
-                           dots <- eval(substitute(list(...)), envir = .self)
-                           .generic_accessor(dots, .self, ".forms")
-                       }else{
-                           .generic_accessor(list(...), .self, ".forms")
-                       }
+                       dots <-
+                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+                           else  list(...)
+                       .generic_getter(dots, .self, ".forms")
                    },
                    expr = function(expr){
                        invisible(eval(substitute(expr), envir = .self))
@@ -256,11 +262,11 @@ newRoot <- function(Class, ...){
     .initMethods(initMethods, .Object)
     .initForms(initForms, .Object)
     if(length(fields))
-        .generic_accessor(fields, .Object, ".fields")
+        .generic_setter(fields, .Object, ".fields")
     if(length(methods))
-        .generic_accessor(methods, .Object, ".methods")
+        .generic_setter(methods, .Object, ".methods")
     if(length(forms))
-        .generic_accessor(forms, .Object, ".forms")
+        .generic_setter(forms, .Object, ".forms")
     eval(expr, envir = objEnv)
     .Object
 }
@@ -287,7 +293,7 @@ newRoot <- function(Class, ...){
                       },
                       cells = function(...){
                           selfEnv <- as.environment(.self)
-                          .generic_accessor(list(...), selfEnv, ".cells")
+                          .generic_setter(list(...), selfEnv, ".cells")
                       }),
                  where = objEnv)
     .Object
@@ -321,7 +327,7 @@ newRoot <- function(Class, ...){
     ## New Cells
     .initCells(initCells, .Object)
     if(length(cells))
-        .generic_accessor(cells, .Object, ".cells")
+        .generic_setter(cells, .Object, ".cells")
     .Object
 }
 
@@ -407,11 +413,11 @@ newRoot <- function(Class, ...){
     .initMethods(initMethods, .Object)
     .initForms(initForms, .Object)
     if(length(fields))
-        .generic_accessor(fields, .Object, ".fields")
+        .generic_setter(fields, .Object, ".fields")
     if(length(methods))
-        .generic_accessor(methods, .Object, ".methods")
+        .generic_setter(methods, .Object, ".methods")
     if(length(forms))
-        .generic_accessor(forms, .Object, ".forms")
+        .generic_setter(forms, .Object, ".forms")
     eval(expr, envir = objEnv)
     .Object
 }
@@ -697,21 +703,42 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
     return(invisible(formNames))
 }
 
-###_ + ACCESSORS
-.generic_accessor <- function(dots, .self, container_name){
+
+###_ + ACCESSES
+.generic_setter <- function(dots, .self, container_name){
     selfEnv <- as.environment(.self)
     switch(container_name,
-           .fields = {getFUN <- .getField; setFUN <- .setField},
-           .forms = {getFUN <- .getForm; setFUN <- .setForm},
-           .methods = {getFUN <- .getMethod; setFUN <- .setMethod},
-           .cells = {getFUN <- .getCell; setFUN <- .setCell},
-           stop("Unrecognised accessor type"))
+           .fields = {setFUN <- .setField},
+           .forms = { setFUN <- .setForm},
+           .methods = { setFUN <- .setMethod},
+           .cells = { setFUN <- .setCell},
+           stop("Unrecognized setter type ", container_name))
+    if(length(dots) == 0L)
+        warning("No arguments to setter (", container_name, "); nothing assigned")
+    else if(all(nzchar(names <- allNames(dots)))){
+        ## SET named objects (as side effect)
+        lapply(names, function(nm)
+               setFUN(selfEnv, nm, dots[[nm]]))
+        invisible(names)
+    }else{
+        stop("Supplied empty names to the setter (", container_name, ")")
+    }
+}
+
+.generic_getter <- function(dots, .self, container_name){
+    selfEnv <- as.environment(.self)
+    switch(container_name,
+           .fields = {getFUN <- .getField},
+           .forms = {getFUN <- .getForm},
+           .methods = {getFUN <- .getMethod},
+           .cells = {getFUN <- .getCell},
+           stop("Unrecognized setter type", container_name))
     .extract <-
         function(names, selfEnv){
             lapply(names, function(nm){
                 out <- getFUN(nm, selfEnv)
                 if(missing(out))
-                    stop("Can not find field \"", nm, "\"")
+                    stop("Can not find object \"", nm, "\"")
                 else
                     out
             })
@@ -721,20 +748,17 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
             ## GET all names
             names <- .get_all_names(get(container_name, envir = selfEnv))
             setNames(.extract(names, selfEnv), names)
-        }else if(length(dots) == 1L && is.character(dots[[1L]])){
-            ## GET suplied names
-            names <- dots[[1L]]
-            setNames(.extract(names, selfEnv), names)
-        }else if(all(nzchar(names <- allNames(dots)))){
-            ## SET named objects (as side effect)
-            lapply(names, function(nm)
-                   setFUN(selfEnv, nm, dots[[nm]]))
-            invisible(names)
         }else{
-            stop("Accessor accepts one argument of the class character, or named arguments of the form \"name = value\"")
+            names <- unlist(dots, TRUE, FALSE)
+            if(!all(sapply(names, is.character)))
+                stop("Accessor accepts only character vectors or lists of character vectors.")
+            if(!all(nzchar(names)))
+                stop("Accessor accepts only nonempty names")
+            setNames(.extract(names, selfEnv), names)
         }
     out
 }
+
 
 ###_  * GETTERS
 .existsMethod <- function(name, selfEnv){
@@ -1067,20 +1091,11 @@ protoField <- function(...)
 ###_ + METHODS
 .initMethods <- function(methods, where){
     "Install the methods in the object WHERE"
-    ## methods is an list which is received as dots in the wrapper
-    ## if list of one element which is a list  use that element
-    if(length(methods) == 1L && is.list(methods[[1L]]))
-        methods <- methods[[1L]]
-    if(is.list(methods)) {
-        ## non empty names
-        methodNames <- names(methods)
-        if(length(methods)> 0 &&
-           (is.null(methodNames) || !all(nzchar(methodNames))))
-            stop("Arguments to methods() must be named, or one named list")
-    }
-    else
-        stop(gettextf("Argument methods must be a list of functions; got an object of class \"%s\"",
-                      class(methods)), domain = NA)
+    ## methods is an list which is received as dots in the wrapper.
+    ## check for  non empty names
+    methodNames <- names(methods)
+    if(length(methods)> 0 && (is.null(methodNames) || !all(nzchar(methodNames))))
+        stop("Arguments to initMethods() must be named")
     if(any(not_fun <- sapply(methods, function(m) !(is.function(m)||is.null(m)))))
         stop("Suplied objects /", paste(names(methods)[not_fun], collapse = ", "), "/ are not functions")
     ## look for objects to remove (new definition is NULL)
@@ -1462,16 +1477,17 @@ areIdenticalPBM <- function(pbm1, pbm2){
     cat(" Type: \"", .type(object), "\"\n", sep = "")
     methods:::.printNames("All objects: ", ls(objEnv, all.names = TRUE))
     methods:::.printNames("Is Root: ", isRoot(object))
+    VL <- 50
     bar <- "\t  --------------------------------  \n"
     cat(" Containers:\n")
     cat(" \n+ Fields:", bar)
-    str(.get_all_names_with_host(".fields", objEnv))
+    str(.get_all_names_with_host(".fields", objEnv), vec.len = VL)
     ## print(.infoContainer(.get_all_names(objEnv[[".fields"]]), objEnv, ".fields"))
     cat(" \n+ Methods:", bar)
-    str(.get_all_names_with_host(".methods", objEnv))
+    str(.get_all_names_with_host(".methods", objEnv), vec.len = VL)
     ## print(.infoContainer(.get_all_names(objEnv[[".methods"]]), objEnv, ".methods"))
     cat(" \n+ Forms:", bar)
-    str(.get_all_names_with_host(".forms", objEnv))
+    str(.get_all_names_with_host(".forms", objEnv), vec.len = VL)
     ## for forms look in objEnv directly:
     ## print(.infoForms(objEnv))
     ## str(list(Fields =  .get_all_names(objEnv[[".fields"]]),
@@ -1487,9 +1503,10 @@ areIdenticalPBM <- function(pbm1, pbm2){
 .show_Context <- function(object){
     callNextMethod()
     objEnv <- as.environment(object)
+    VL = 50
     bar <- "\t --------------------------------  \n"
     cat("\n+ Cells:", bar)
-    str(.get_all_names_with_host(".cells", objEnv))
+    str(.get_all_names_with_host(".cells", objEnv), vec.len = VL)
     cell_names <- ls(objEnv[[".cells"]], all.names = TRUE)
     rev_names <- strsplit(cell_names, ".", fixed = TRUE)
     rev_names <- sapply(rev_names, function(el) paste(rev(el), collapse = "."))

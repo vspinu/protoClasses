@@ -10,17 +10,26 @@ Y$forms
 
 ## METHODS:
 names(X$methods())
-names(X$methods(c("expr", "initMethods")))
-names(X$methods("expr", "initMethods")) ## error todo: not consistent with name = value interface
+names(X$methods(list("expr", "initMethods")))
+## arguments are unlisted and squashed
+names(X$methods(list("expr", list("initMethods")), c("expr")))
+names(X$methods("expr", "initMethods", "expr"))
+names(X$methods(c("expr", "initMethods", "expr")))
 
 X$initMethods(mymeth = function(a, b) a + b)
 names(Y$methods())
-Y$mymeth(34, 43)
-Y$methods(mymeth = function(a, b) a/b)
-Y$mymeth(34, 43)
-X$mymeth(34, 43)
+Y$mymeth(1, 2)
+Y$setMethods(mymeth = function(a, b) a/b)
+Y$mymeth(1, 2)
+Y$setMethods(.list = list(mymeth = function(a, b) 10*a/b))
+Y$mymeth(1, 2)
+Y$setMethods(mymeth1 = function(a, b) a/b)
+
+
+## X calls the old one:
+X$mymeth(1, 2)
 Y$initMethods(mymeth = NULL) ## clean the methods
-Y$mymeth(34, 43)
+Y$mymeth(1, 2)
 
 X
 x <- new("protoCell", prot = "*", type = "x", expr = {appp <- 232323})
