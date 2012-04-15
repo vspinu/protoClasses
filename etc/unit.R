@@ -25,13 +25,28 @@ Y$setMethods(.list = list(mymeth = function(a, b) 10*a/b))
 Y$mymeth(1, 2)
 Y$setMethods(mymeth1 = function(a, b) a/b)
 
-
-## X calls the old one:
+## X still calls the old method:
 X$mymeth(1, 2)
-Y$initMethods(mymeth = NULL) ## clean the methods
+## clear the method in Y
+Y$initMethods(mymeth = NULL)
 Y$mymeth(1, 2)
 
-X
+
+## FIELDS:
+Y$type
+X$initFields(aaa = "test string")
+Y$aaa
+Y$setFields(aaa = 435454)
+Y$aaa <- 3434343
+Y$aaa ## converted to character
+X$aaa
+Y$setFields(aaa = 34343)
+Y$fields()
+Y$initFields(fff = NULL)
+Y$fields()
+Y$fff <- "sdfdsf"
+
+
 x <- new("protoCell", prot = "*", type = "x", expr = {appp <- 232323})
 y <- new("protoCell", prototype = x, type = "y")
 .infoCell(y)

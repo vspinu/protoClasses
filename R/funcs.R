@@ -164,11 +164,13 @@ newRoot <- function(Class, ...){
                            else c(list(...), .list)
                        .generic_setter(dots, .self, ".methods")
                    },
-                   initFields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv) {
+                   initFields = function(..., .list = list(), .classes = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv) {
                        dots <-
-                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                           else  list(...)
-                       .initFields(dots, .self)
+                           if(changeCallEnv){
+                               .classes <- eval(substitute(.classes), envir = .self)
+                               eval(substitute(c(list(...), .list)), envir = .self)
+                           }else  c(list(...), .list)
+                       .initFields(dots, .self, .classes)
                    },
                    setFields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
                        dots <-
@@ -706,7 +708,7 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
 
 ###_ + ACCESSES
 .generic_setter <- function(dots, .self, container_name){
-    selfEnv <- as.environment(.self)
+    ## selfEnv <- as.environment(.self)
     switch(container_name,
            .fields = {setFUN <- .setField},
            .forms = { setFUN <- .setForm},
@@ -718,7 +720,7 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
     else if(all(nzchar(names <- allNames(dots)))){
         ## SET named objects (as side effect)
         lapply(names, function(nm)
-               setFUN(selfEnv, nm, dots[[nm]]))
+               setFUN(.self, nm, dots[[nm]]))
         invisible(names)
     }else{
         stop("Supplied empty names to the setter (", container_name, ")")
@@ -847,7 +849,7 @@ or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], 
         method <- new("protoMethod", value)
         installBinding(method, x, name, ".methods")
     }else{
-        stop("Object ", name, " is not a valid method in the protoObject of type \"", get("type", x), "\"")
+        stop("Object \"", name, "\" is not a valid method in the protoObject of type \"", .type(x), "\"")
     }
 }
 
@@ -957,9 +959,6 @@ If name is aa.bb, all the registered forms starting with aa.bb will
 
 
 ###_ + FIELDS
-protoField <- function(...)
-    new("protoField", ...)
-
 .initialize_Field <- function(.Object,  ...){
     .Object <- callNextMethod()
     name <- .Object@bindName
@@ -1033,33 +1032,32 @@ protoField <- function(...)
     .Object
 }
 
-.initFields <- function(fields, where){
+.initFields <- function(fields, where, classes = list()){
     "Install the FIELDS in the object WHERE"
-    if(length(fields) == 1L && is.null(names(fields)) &&
-       (identical(class(fields[[1L]]), "character")||
-        identical(class(fields[[1L]]), "list"))){
-        ## TREAT AS A VECTOR OF DEFAULT CLASSES,
-        ## this is the only way to supply "function" field
-        fields <- fields[[1L]]
-        if(is.character(fields))
-            fields <- as.list(fields)
+    ## can supply NULL to fields or "NULL" class to remove
+    fieldClasses <- character()
+    fieldInits <- list()
+    fieldNames <- character()
+    if(length(classes) > 0L){
+        fields <- as.list(classes)
         ## classes or NULL
         fieldNames <- names(fields)
         if(length(fields)> 0 && (is.null(fieldNames) || !all(nzchar(fieldNames))))
-            stop("A list or character argument for fields must have nonempty names for all the fields")
+            stop("Classes argument to initFields must have nonempty names")
         if(!all(sapply(fields, is.character)))
-            stop("A list or character argument for fields must be a list of class names.")
+            stop("Classes argument to initFields must be a character vector or list of strings.")
         fieldClasses <- as.character(fields) ## converts NULL to "NULL":)
         fieldInits <- sapply(fieldClasses, new)
-    }else{
-        ## TREAT AS A LIST OF INITIAL VALUES
-        fieldNames <- names(fields)
-        if( length(fields)> 0 && (is.null(fieldNames) ||
-                                  !all(nzchar(fieldNames))))
-            stop("A list argument for fields must have nonempty names for all the fields")
-        fieldClasses <- lapply(fields,  class)
-        fieldInits <- fields
     }
+    ## TREAT AS A LIST OF INITIAL VALUES
+    fieldNames1 <- names(fields)
+    if( length(fields)> 0 && (is.null(fieldNames1) ||
+                              !all(nzchar(fieldNames1))))
+        stop("Arguments to initFields must have nonempty names")
+    fieldClasses <- c(fieldClasses, lapply(fields,  class))
+    fieldInits <- c(fieldInits, fields)
+    fieldNames <- c(fieldNames, fieldNames1)
+
     whereEnv <- as.environment(where)
     ## look for objects to remove (new definition is NULL)
     removeThese <- sapply(fieldClasses, identical, "NULL")
@@ -2187,3 +2185,5 @@ browseForms <-
                          paste(names, collapse = ", "))
         browseInfo(x, title = title, header1 = header1, header2 = header2, stylesheet = stylesheet, ...)
     }
+
+source("../R/classes.R")

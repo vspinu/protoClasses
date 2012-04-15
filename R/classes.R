@@ -61,6 +61,8 @@ setClass("protoField",
          contains = "protoFunction")
 setMethod("initialize", signature(.Object = "protoField"),
           .initialize_Field)
+protoField <- function(func, className, ...)
+    new("protoField", func, className = className, ...)
 
 setMethod("installBinding", "protoField",
           .installBinding_protoField)
