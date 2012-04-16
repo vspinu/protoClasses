@@ -57,12 +57,13 @@ setClass("protoField",
                         installedObjectNames = "character",
                         className = "character",
                         container = "character"),
-         prototype(container = ".fields"),
+         prototype(container = ".fields",
+                   bindName = "dummy_field"),
          contains = "protoFunction")
 setMethod("initialize", signature(.Object = "protoField"),
           .initialize_Field)
-protoField <- function(func, className, ...)
-    new("protoField", func, className = className, ...)
+protoField <- function(func = function(value) NULL ,  doc = "", ...)
+    new("protoField", func, doc = doc, ...)
 
 setMethod("installBinding", "protoField",
           .installBinding_protoField)
