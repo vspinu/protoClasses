@@ -535,11 +535,28 @@ isECall <- function(obj){
         FALSE
 }
 
-.assignFormBasic <- function(formName, form, where, register = TRUE, after = NULL){
-    "Assign the form if not present, or insert after AFTER to the existing one in WHERE.\n'
-If AFTER is NULL or >= length of existing form - append. if <= 0 - preppend.
-No name checks.\n
-Don't assign if new form is identical to the installed one."
+## .getOrCreateForm <- function(bindName, whereEnv)
+##     if(exists(bindName, envir = get(".forms", envir = whereEnv))){
+##         get(bindName, envir = whereEnv)
+##     }else{
+##         new("protoForm")
+##     }
+
+
+.replaceDots <- function(names){
+    if(length(dot_here <- grep(".", names, fixed = TRUE))){
+        warning("\".\" was replaced with \"_\" in ",
+                paste(names[dot_here], collapse=", "))
+        names <- gsub(".", "_", names, fixed = TRUE)
+    }
+    names
+}
+
+.assignSubForms <- function(formName, form, where, register = TRUE, after = NULL){
+    " If oldForm with the name formName exists replace supbforms form FORM in oldForm, assign form with formName otherwise.
+ If AFTER is NULL just replace the subforms from old form by new subforms (the default)
+ if <= 0 - preppend, if => length(oldForm) append. No name checks.
+ Don't assign if new form is identical to the installed one."
     do_assign <- FALSE
     if(exists(formName, envir = get(".forms", envir = where))){
         ## adds forms to existing one
@@ -554,11 +571,13 @@ Don't assign if new form is identical to the installed one."
                 after <- NULL
         }
         newForm <-
-            if(is.null(after) || after >= length(oldForm)){
+            if(is.null(after)){
                 newForm <- oldForm
                 for(nm in allNames(form))
-                    newForm[[nm]] <- form[[nm]] ## form should replace the old one
+                    newForm[[nm]] <- form[[nm]] ## subforms should replace the old ones
                 newForm
+            }else if (after >= length(oldForm)){
+                as(c(oldForm, form), class(oldForm))
             }else if (after <= 0){
                 as(c(form, oldForm), class(oldForm))
             }else{
@@ -572,124 +591,91 @@ Don't assign if new form is identical to the installed one."
     }
     if(do_assign){
         assign(formName, newForm, envir = where)
-        ## default install binding in the .forms container
-        installBinding(new("formInfo", formClass = class(newForm)),
-                       where, formName, ".forms")
+        .installBinding_default(new("formInfo", formClass = class(newForm)),
+                                where, formName, ".forms")
     }
     do_assign
 }
 
-
 .installBinding_protoForm <- function(bindInfo, where, bindName, container = ".forms",
-                                      after = NULL){
-    ## Used recursively:
+                                      after = NULL, returnBinding = bindName){
+    ## * Used recursively:
     ## if bindInfo is form - assign in the whereEnv
     ## if bindInfo is an expression - just return it
-    ## If the form with name of the form aa.bb.cc is assigned,
-    ## check for existence of aa,  aa.bb, aa.bb.cc and install in the current
-    ## container if modified (ie if not identical() to what is already installed
-    ## in the container)
-    ## If bindInfo == NULL then all the forms (inlusive this) are removed from where
-    ## if AFTER is nonnull it must be character or an integer specifying
-    ## the position new forms to be inserted.
-    form <- bindInfo
+    ## * main idea: an assigned form should have only calls like e(aa.bb.cc) or
+    ## simple expressions. No forms as children.
+    ## * If the form's name is like aa.bb.cc ,check for existence of aa.bb and aa
+    ## and install the eform e(aa.bb.cc) into aa.bb with the name "cc" and
+    ## e(aa.bb) into "aa" with the name "bb".
+    ## * If bindInfo == NULL then all the children forms ("aa.bb.cc.dd" etc) and
+    ## this form are removed from WHERE
+    ## * if AFTER is nonnull it must be character or an integer specifying
+    ## the position of the new form "cc" in the parent form "aa.bb"
+
     whereEnv <- as.environment(where)
-    rec_names <- unlist(strsplit(bindName, split = ".", fixed = TRUE))     ## "aa" "bb" "cc"
+    form <- bindInfo
+
+    ## bindName is aa.bb.cc
+    rec_names <- unlist(strsplit(bindName, split = ".",  ## "aa" "bb" "cc"
+                                 fixed = TRUE), use.names=FALSE)
     cum_names <- Reduce(function(x, y) ## "aa.bb.cc" "aa.bb"    "aa"
                         c(paste(x[[1]], y, sep = "."), x), rec_names)
-    thisName <- cum_names[[1]] ## aa.bb.cc
-    do.assign <- TRUE
     if(is.null(form))
-        ##NULL
         return(.removeFormWithChildren(bindName, whereEnv))
-    else if(length(form) == 0){
-        form <- .F()
-        if(!exists("bindName", envir = whereEnv[[".forms"]])){
-            assign(bindName, form, envir = whereEnv)
-            ## default install binding in the .forms container
-            installBinding(new("formInfo", formClass = class(form)),
-                           whereEnv, bindName, ".forms")
-        }
-        ##.emptyFormWithChildren(bindName, whereEnv) ##.F()
-    }
+
     if(is(form, "protoForm")){
-        ## create (or append to) parent formss (i.e. aa.bb, aa)
-        while(do.assign)
-            if(length(cum_names) > 1){
-                do.assign <-
-                    ## aa.bb = form(cc = e(aa.bb.cc))
-                    .assignFormBasic(cum_names[[2]],
-                                     .makeEForm(cum_names[[1]]), whereEnv, after = after)
-                cum_names <- cum_names[-1]
-            }else{
-                do.assign <- FALSE
-            }
-        ## shortNames (dd, ff)
-        ## Do not allow "." in short names (fixme: split them?)
-        shortNames <- names(form)
-        if(length(dot_here <- grep(".", shortNames, fixed = TRUE))){
-            warning("\".\" was replaced with \"_\" in ",
-                    paste(shortNames[dot_here], collapse=", "))
-            shortNames <- gsub(".", "_", shortNames, fixed = TRUE)
+        ## create parent forms (i.e. aa.bb, aa) if needed:
+        assigned <- TRUE
+        last_assigned <- bindName
+        while(assigned && length(cum_names) > 1L){
+            assigned <-
+                .assignSubForms(cum_names[[2]], ## aa.bb = form(cc = e(aa.bb.cc))
+                                 .makeEForm(cum_names[[1]]), whereEnv, after = after)
+            last_assigned <- cum_names[[1L]]
+            cum_names <- cum_names[-1L]
         }
-        ## longNames (aa.bb.cc.dd, aa.bb.cc.ff)
-        longNames <- paste(thisName, shortNames, sep = ".")
-        ## Get the existing aa.bb.cc form:
-        newForm <-
-            oldForm <-
-                if(exists(thisName, envir = get(".forms", envir = whereEnv)))
-                    get(thisName, envir = whereEnv)
-                else new("protoForm")
-        ## install each element of the "form" (a form or an expression)
-        for(i in seq_along(shortNames)){
-            nm <- shortNames[[i]]
-            newForm[[nm]] <-
-                .installBinding_protoForm(form[[i]], whereEnv, longNames[[i]]) #can not use generic here, form[[i]] can be an expressiong
-        }
-        ## install newForm only if different
-        if(!identical(newForm, oldForm)){
-            ## DON'T REMOVE ANY MISSING FORMS FROM THE PROTOOBJECT !! TOTHINK:
-            ## Against removing:
-            ## a) exec forms and coceptual containers are separeted
-            ## b) recursive removing complicates the design
-            ## c) Not clear if to remove sub - forms only in current cell or sub - types as well
-            ## Pro removing: a) protoForms behave like genuine recursive objects in R
-            assign(bindName, newForm, envir = whereEnv)
-            ## default install binding in the .forms container
-            installBinding(new("formInfo", formClass = class(form)),
-                           whereEnv, bindName, ".forms")
-        }
-        return(.makeEexpr(thisName))
+        print(last_assigned)
+        shortNames <- names(form) ## (dd, ff)
+        firstNames <- gsub("\\..*", "", shortNames)
+        longNames <- paste(bindName, shortNames, sep = ".") ## (aa.bb.cc.dd, aa.bb.cc.ff)
+        newForm <- new("protoForm")
+        for(i in seq_along(firstNames))
+            newForm[[firstNames[[i]]]] <-
+                ## if a form install, if expression just return
+                .installBinding_protoForm(form[[i]], whereEnv, longNames[[i]],
+                                          returnBinding = paste(bindName, firstNames[[i]], sep = "."))
+        # -------------------------------------------------------------- #
+        # install newForm only if different                              #
+        # if(exists(bindName, envir = get(".forms", envir = whereEnv))){ #
+        #     oldForm <- get(bindName, envir = whereEnv)                 #
+        # if(!identical(newForm, oldForm)){                              #
+        # -------------------------------------------------------------- #
+        assign(bindName, newForm, envir = whereEnv)
+        .installBinding_default(new("formInfo", formClass = class(form)),
+                                whereEnv, bindName, ".forms")
+        return(.makeEexpr(returnBinding))
     }else{
         ## .assignForm should no be used directly to assign non protoForm objects !!
         return(form)  ## returns as is (i.e. expression), nothing is assigned
     }
 }
 
-.initForms <- function(forms, where, after = NULL){
+.initForms <- function(forms, where, after = NULL, emptyforms = c()){
     "init the FORMS in the object WHERE"
-    if(length(forms) == 1L && is.list(forms[[1L]]))
-        forms <- forms[[1L]]
-    if(is.character(forms)) {
-        ## treat as empty "expressions"
-        formNames <- forms
-        forms <- as.list(rep(expression(), length(forms)))
-        names(forms) <- formNames
-    }
-    else if(is.list(forms)) {
-        ## non empty names
-        formNames <- names(forms)
-        if(length(forms)>0 && ( is.null(formNames) ||
-                               !all(nzchar(formNames))))
-            stop("A list argument for forms() must have nonempty names for all the suplied object")
-        if(!(all(which <- unlist(lapply(forms, function(x) is.language(x) || is.null(x))))))
-            stop("Arguments to forms() must be a class extending name, call or expression,
-or a list of these /see ?is.language/. Not true for ", paste(formNames[!which], collapse = ", "))
-    }
-    else
-        stop(gettextf("Improper argument for forms(), must be a list or a character vector ; got an object of class \"%s\"",
-                      class(forms)), domain = NA)
     whereEnv <- as.environment(where)
+    ## tothink: do I really need emptyforms?
+    if(length(emptyforms) > 0L){
+        forms <- c(forms, setNames(as.list(rep(expression(), length(emptyforms))), as.character(emptyforms)))
+    }
+    if(!is.null(after))
+        forms <- rev(forms)
+    ## non empty names?
+    formNames <- names(forms)
+    if(length(forms)>0 && ( is.null(formNames) ||
+                           !all(nzchar(formNames))))
+        stop("Arguments to 'initForms' must have nonempty names")
+    if(!(all(which <- unlist(lapply(forms, function(x) is.language(x) || is.null(x))))))
+        stop("Arguments to 'initForms' must be a subclass of name, call or expression /see ?is.language/. Not true for ", paste(formNames[!which], collapse = ", "))
     ## look for objects to remove (new definition is NULL)
     removeThese <- sapply(forms, is.null)
     if(any(removeThese)){
@@ -921,19 +907,18 @@ If name is aa.bb, all the registered forms starting with aa.bb will
         if(missing(out)){
             out <- .getForm(name, selfEnv)
             if(missing(out))
-                stop("Object ", name, " is not a valid method, field or form in the protoObject of type ", .type(x))
+                stop("Cannot find object \"", name, "\" in the protoObject of type ", .type(x))
         }
     }
     out
 }
 
-.dollarSet_envProtoClass <- .setField
-
+.dollarSet_envProtoClass <- .setField ## todo? forms
 .dollarGet_protoContext <- function(x, name){
     if(!is.null(obj <- .getCell(name, as.environment(x))))
         return(obj)
     else
-        .dollarGet_envProtoClass(x, name) ## todo: error message is misleading
+        .dollarGet_envProtoClass(x, name)
 }
 
 .dollarSet_protoContext <- function(x, name, value){ # must follow dollar arguments, dont realy like this :(
@@ -956,18 +941,16 @@ If name is aa.bb, all the registered forms starting with aa.bb will
 }
 
 
-
-
 ###_ + FIELDS
 .initialize_Field <- function(.Object,  ...){
     .Object <- callNextMethod()
     name <- .Object@bindName
     className <- .Object@className
-    if(is.null(body(.Object))){
-        ## default fields (i.e. function was not supplied)
+    if(is.null(body(.Object)) && length(className) > 0L){
+        ## Default fields (i.e. function was not supplied)
         metaName <- as.character(name)
-        if(length(className) == 0L || identical(className, "ANY")){
-            ## "ANY"
+        if(identical(className, "ANY")){
+            ## "Any"
             .Object@.Data <-
                 eval(substitute(function(value) {
                     if(missing(value)){
@@ -978,7 +961,6 @@ If name is aa.bb, all the registered forms starting with aa.bb will
                     }
                 }, list(dummyField = as.name(metaName),
                         dummyName = metaName)))
-            className <- "ANY"
         }else if(isVirtualClass(className)){
             ## "VIRTUAL"
             .Object@.Data  <-
@@ -987,7 +969,7 @@ If name is aa.bb, all the registered forms starting with aa.bb will
                         dummyField
                     }else{
                         if(is(value, dummyClass)){
-                            value <- as(value, dummyClass)
+                            ## value <- as(value, dummyClass)
                             assign(dummyName, value, envir = .self)
                             invisible(value)
                         }
@@ -1028,7 +1010,7 @@ If name is aa.bb, all the registered forms starting with aa.bb will
                         dummyClass = className)))
         }
     }
-    .Object@className <- if(length(className) == 0L)  "custom" else className
+    ## .Object@className <- if(length(className) == 0L)  "custom" else className
     .Object
 }
 
@@ -1039,24 +1021,25 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     fieldInits <- list()
     fieldNames <- character()
     if(length(classes) > 0L){
-        fields <- as.list(classes)
+        classes <- unlist(classes)
         ## classes or NULL
-        fieldNames <- names(fields)
-        if(length(fields)> 0 && (is.null(fieldNames) || !all(nzchar(fieldNames))))
+        fieldNames <- names(classes)
+        if(is.null(fieldNames) || !all(nzchar(fieldNames)))
             stop("Classes argument to initFields must have nonempty names")
-        if(!all(sapply(fields, is.character)))
+        if(!all(sapply(classes, is.character)))
             stop("Classes argument to initFields must be a character vector or list of strings.")
-        fieldClasses <- as.character(fields) ## converts NULL to "NULL":)
-        fieldInits <- sapply(fieldClasses, new)
+        fieldClasses <- as.character(classes) ## converts NULL to "NULL":)
+        fieldInits <- sapply(fieldClasses, function(class)
+                             if(isVirtualClass(class)) "NA" else new(class))
     }
     ## TREAT AS A LIST OF INITIAL VALUES
     fieldNames1 <- names(fields)
     if( length(fields)> 0 && (is.null(fieldNames1) ||
                               !all(nzchar(fieldNames1))))
         stop("Arguments to initFields must have nonempty names")
+    fieldNames <- c(fieldNames, fieldNames1)
     fieldClasses <- c(fieldClasses, lapply(fields,  class))
     fieldInits <- c(fieldInits, fields)
-    fieldNames <- c(fieldNames, fieldNames1)
 
     whereEnv <- as.environment(where)
     ## look for objects to remove (new definition is NULL)
@@ -1071,12 +1054,12 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     ## install all bindings in the container .fields
     for(i in seq_along(fieldNames)){
         field <-
-            if(fieldClasses[[i]] == "protoField"){
+            if(extends(fieldClasses[[i]], "protoField")){
                 ## protoField is suplied, thus don't assign initial value in WHERE
                 new("protoField", fieldInits[[i]], bindName = fieldNames[[i]])
             }else{
-                ## the default fields; assign initial value in WHERE
-                assign(fieldNames[[i]], fieldInits[[i]], envir = whereEnv)
+                if(!isVirtualClass(fieldClasses[[i]]))
+                    assign(fieldNames[[i]], fieldInits[[i]], envir = whereEnv)
                 new("protoField",
                     bindName = fieldNames[[i]],
                     className = fieldClasses[[i]])
@@ -1272,15 +1255,14 @@ C <- function(...){
 
 .installBinding_protoField <- function(bindInfo, where, bindName, container, ...){
     ## assign if different
-    containerEnv <- get(container, envir = where)
-    if(exists(bindName, envir = containerEnv)){
-        oldField <- get(bindName, envir = containerEnv)
-        if(!identical(bindInfo, oldField))
-            callNextMethod()
-        ## else do nothing
-    }else{
-        callNextMethod()
-    }
+    ## containerEnv <- get(container, envir = where)
+    ## if(exists(bindName, envir = containerEnv)){
+    ##     oldField <- get(bindName, envir = containerEnv)
+    ##     ## if(!identical(bindInfo, oldField))
+    ##     ##     callNextMethod()
+    ##     ## ## else do nothing
+    ## }else{
+    callNextMethod()
 }
 
 .changeEnvFuncs <- function(envir){
@@ -1527,25 +1509,25 @@ areIdenticalPBM <- function(pbm1, pbm2){
                 if(length(form@doc)) {
                     cat("## DOC: \n")
                     print(form@doc)
+
                 }
+                for(i in seq_along(form)){
+                    fm <- form[[i]]
+                    if(isECall(fm)){
+                        Recall(as.character(fm[[2]]), where, lev = lev + 1L, code)
+                    }else{
+                        if(code){
+                            te <- as.expression(fm)[[1]]
+                            attr(te, "wholeSrcref") <- NULL ## kludge
+                            attr(te, "srcfile") <- NULL ## kludge
+                            cat(paste(paste(rep.int("   ", lev), collapse = ""),
+                                      capture.output(print(te))),  sep ="\n")
+                        }}
+                }
+            }else{
+                cat(rep(".. ", lev),"e(", name, ") <-- missing\n", sep = "")
             }
-            for(i in seq_along(form)){
-                fm <- form[[i]]
-                if(isECall(fm)){
-                    Recall(as.character(fm[[2]]), where, lev = lev + 1L, code)
-                }else{
-                    if(code){
-                        te <- as.expression(fm)[[1]]
-                        attr(te, "wholeSrcref") <- NULL ## kludge
-                        attr(te, "srcfile") <- NULL ## kludge
-                        cat(paste(paste(rep.int("   ", lev), collapse = ""),
-                                  capture.output(print(te))),  sep ="\n")
-                    }}
-            }
-        }else{
-            cat(rep(".. ", lev),"e(", name, ") <-- missing\n", sep = "")
-        }
-    }
+        }}
     ## cat("##", name, "\n", sep = "")
     f_names <- names(x)
     for(i in seq_along(x)){
