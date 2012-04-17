@@ -345,21 +345,22 @@ newRoot <- function(Class, ...){
 
 .initialize_protoCell <- function(.Object,
                                   prototype = "*",
-                                  homeContext = NULL,
                                   type = "--",
-                                  initFields = list(), initMethods = list(), initForms = list(),
-                                  fields = list(), methods = list(), forms = list(),
-                                  expr = expression(),
+                                  homeContext = NULL,
+                                  ## initFields = list(), initMethods = list(), initForms = list(),
+                                  ## fields = list(), methods = list(), forms = list(),
+                                  ## expr = expression(),
                                   ...){
     ## PROTOTYPE can be a character string or a valid envProtoObject
     ## ---
-    ## Clone the CELL if CELL of type_long exists in the inherited container,
+    ## DON'T clone the CELL if CELL of type_long exists in the inherited container (why to clone?)
     ## create a new one otherwise.
-    ## CELL is NOT installed in the context.
+    ## CELL is *NOT* installed in the context (it's the task of initCell interface)
     ## note: cannot create the root cell!! supplying * as TYPE produces the cell *.*
+
     ## CONTEXT
     if(is.null(context <- homeContext))
-                                        #default context
+        ##default context
         context <- getClassDef(getClassDef(class(.Object))@contextClass)@defaultContext
     isValidProtoObject(context, trigger_error = TRUE, object_name = "context")
     ## PROTOTYPE
@@ -374,9 +375,9 @@ newRoot <- function(Class, ...){
         stop(gettextf("Attempt to create an object of class %s in a homeContext of class %s which doesn't extend cell's default context class %s",
                       class(.Object), class(homeContext), tCls))
 
-    ## CREATE OR CLONE THE CELL
+    ## CREATE THE CELL
     type <- as.character(type)
-    type_long <- paste(type, .type(prototype), sep = ".")
+    ## type_long <- paste(type, .type(prototype), sep = ".")
     ## the_cell <-
     ## if(is.null(homeContext)){ # default context
     ##     ## lookup in DEFAULT .cells!!
@@ -390,37 +391,36 @@ newRoot <- function(Class, ...){
     ## else NULL
     ## }
 
-    if(!exists(type_long, envir = parent.env(.cells))){
+    ## if(!exists(type_long, envir = parent.env(.cells))){
         ## create a NEW one:
-        .Object <- callNextMethod(.Object, prototype = prototype, type = type, ...)
-    }else{
-        ## type_long is FOUND so  CLONE:
-        the_cell <- get(type_long, envi = parent.env(.cells))
-        obj <- as.environment(clone(the_cell))
-        ## REDIRECT parents of containers   ## note: no problems with cloning * cell; it's just not allowed to create *
-        parent.env(get(".forms", envir = obj)) <- get(".forms", envir = prototype)
-        parent.env(get(".methods", envir = obj)) <- get(".methods", envir = prototype)
-        parent.env(get(".fields", envir = obj)) <- get(".fields", envir = prototype)
-        .Object@.xData <- as.environment(obj) ##!! do not replace the incoming object class!!!
-    }
+    .Object <- callNextMethod(.Object, type = type, prototype = prototype,  ...)
+    ## }else{
+    ##     ## type_long is FOUND so  CLONE:
+    ##     the_cell <- get(type_long, envi = parent.env(.cells))
+    ##     obj <- as.environment(clone(the_cell))
+    ##     ## REDIRECT parents of containers   ## note: no problems with cloning * cell; it's just not allowed to create *
+    ##     parent.env(get(".forms", envir = obj)) <- get(".forms", envir = prototype)
+    ##     parent.env(get(".methods", envir = obj)) <- get(".methods", envir = prototype)
+    ##     parent.env(get(".fields", envir = obj)) <- get(".fields", envir = prototype)
+    ##     .Object@.xData <- as.environment(obj) ##!! do not replace the incoming object class!!!
+    ## }
 
-
-    ## Special OBJECTS:
+    ## ## Special OBJECTS:
     objEnv <- as.environment(.Object)
     objEnv[[".homeContext"]] <- homeContext
     objEnv[[".self"]] <- .Object
 
     ## User INITS:
-    .initFields(initFields, .Object)
-    .initMethods(initMethods, .Object)
-    .initForms(initForms, .Object)
-    if(length(fields))
-        .generic_setter(fields, .Object, ".fields")
-    if(length(methods))
-        .generic_setter(methods, .Object, ".methods")
-    if(length(forms))
-        .generic_setter(forms, .Object, ".forms")
-    eval(expr, envir = objEnv)
+    ## .initFields(initFields, .Object)
+    ## .initMethods(initMethods, .Object)
+    ## .initForms(initForms, .Object)
+    ## if(length(fields))
+    ##     .generic_setter(fields, .Object, ".fields")
+    ## if(length(methods))
+    ##     .generic_setter(methods, .Object, ".methods")
+    ## if(length(forms))
+    ##     .generic_setter(forms, .Object, ".forms")
+    ## eval(expr, envir = objEnv)
     .Object
 }
 
@@ -1099,10 +1099,9 @@ If name is aa.bb, all the registered forms starting with aa.bb will
 ###_ + CELLS
 .initCells <- function(cells, where){
     "Install the CELLS in the object WHERE"
-    ## cells must be a list,  names(cells) have precedence over internal type
-    ## if el of cells is 'character' it is looked up in the .cells,  if not
-    ## found produce an error!!
-    ## do not overwrite names in the program!
+    ## cells must be a list,  names(cells) have precedence over internal type;
+    ##  'character' elements are looked up in the .cells environment,  if cannot
+    ##  find produce an error!! do not overwrite names in the program!
     ##
     if(!is(where, "protoContext")) stop("Argument \"where\" must extend the class \"protoContext\"")
     if(is.list(cells)) {
@@ -1130,8 +1129,8 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     for(i in seq_along(cells)){
         if(is.character(cells[[i]]))
             ## install from inhereted contexts ## canot use 'new', it can not produce "*" cell
-            cells[[i]] <- .getPartial(cells[[i]], get(".cells", envir = whereEnv), object_name = "cell")
-        ##names have precedence over types (types should not be used explicitly at user level)
+            cells[[i]] <- .getPartial(cells[[i]], get(".cells", envir = whereEnv), object_name = "cell") # error if not found
+        ##names have precedence over types here (types should not be used explicitly at user level)
         installBinding(cells[[i]], where, cellTypes[[i]], ".cells")
     }
     return(invisible(cellTypes))
@@ -1139,15 +1138,13 @@ If name is aa.bb, all the registered forms starting with aa.bb will
 
 .installCellInContext <- function(cell, context, container = ".cells"){
     ## CELL and PROTOTYPES are cloned if not homeless or not already  associated
-    ## with CONTEXT
-    ## CELL and missing PROTOTYPES  are inserted into the container, if needed
-    ## with the current context. Prototype chain is followed as long as
-    ## proto_type is not found in current context.
-    .to_clone <- function(cell, context)
-        ## CLONE if not homeless or already associated with the context
-        !(is.null(homeContext(cell)) ||
-          identical(as.environment(context),
-                    as.environment(homeContext(cell))))
+    ## with CONTEXT.
+    ## CELL and missing PROTOTYPES are inserted into the container (i.e. prototype
+    ## chain is followed as long as proto_type is not found in current context).
+    .to_clone <- function(cell) #, context)
+        ## CLONE if not (homeless or associated with context)
+        !(is.null(homeContext(cell)) || identical(as.environment(context),
+                                                  as.environment(homeContext(cell))))
     stopifnot(is(cell, "protoCell"))
     if(!is(context, tCls <- getClassDef(class(cell))@contextClass))
         stop(gettextf("Suplied context class /%s/ does not extend the default context class of the cell /%s/",
@@ -1157,41 +1154,35 @@ If name is aa.bb, all the registered forms starting with aa.bb will
         cell <- clone(cell)
     if(!extends(class(cell), tCls <- getClassDef(class(context))@cellClass))
         cell <- as(cell, tCls)  ## note: some functionality might be missing, provide explicit coerce method.
-    cellEnv <- as.environment(cell)
     containerEnv <- as.environment(contextEnv[[container]])
-    short_type <- cellEnv[["type"]]
-    if(identical(short_type, "--"))
+    if(identical("--", as.environment(cell)[["type"]]))
         stop("Cannot install cell of type \"--\"; please supply the type argument.")
-    type <- .type(cell)
+
+    ## KEEP CLONING and INSERTING  prototypes when not in the container
     cell_to_return <- cell
-    prototype <- cellEnv[[".prototype"]]
-    ## KEEP INSERTING cell -> prototypes if doesn't exist
+    prototype <- .getPrototype(cell)
     while(!is.null(prototype) &&
           !exists(prot_type <- .type(prototype),
                   envir = containerEnv, inherits = FALSE)){
-        ## Disregard the prototype if already exists in the current container!!
-        containerEnv[[type]] <- cell
+        containerEnv[[.type(cell)]] <- cell
         .redirect_prototypes(cell, containerEnv)
-        cellEnv[[".homeContext"]] <- context ## fixme: make a function setHomeContext!
+        .setHomeContext(cell, context)
         setPrototype(cell, ## sets parent.env as well
-                     if(.to_clone(prototype, context)){
-                         clone(prototype)
-                     }else{
-                         prototype
-                     })
+                     if(.to_clone(prototype)) clone(prototype)
+                     else prototype )
         ## ------
-        cell <- cellEnv[[".prototype"]]
-        cellEnv <- as.environment(cell)
-        type <- .type(cell)
-        prototype <- cellEnv[[".prototype"]]
+        cell <- .getPrototype(cell)
+        prototype <- .getPrototype(cell)
     }
-    ## NOTE: if cell is already in container nothing changes
-    containerEnv[[type]] <- cell
+    ## if cell is already in container, nothing changes
+    containerEnv[[.type(cell)]] <- cell
     .redirect_prototypes(cell, containerEnv)
-    cellEnv[[".homeContext"]] <- context
+    .setHomeContext(cell, context)
     if(is.null(prototype)){ ## root
-        parent.env(cellEnv) <- get(".rootParentEnv", contextEnv) ## fixme:  make function getRootParentEnv
+        cellEnv <- as.environment(cell)
+        parent.env(cellEnv) <- get(".rootParentEnv", contextEnv)
     }else{
+        ## Disregard the prototype if it's type already exists in the current container!!
         setPrototype(cell, containerEnv[[prot_type]])
     }
     invisible(cell_to_return)
@@ -1206,7 +1197,6 @@ If name is aa.bb, all the registered forms starting with aa.bb will
             setPrototype(cell, prototype)
     })
 }
-
 
 cellFromInfo <- function(cellInfo, homeContext){
     stopifnot(is(cellInfo, "cellInfo"))
@@ -1486,7 +1476,7 @@ areIdenticalPBM <- function(pbm1, pbm2){
     VL = 50
     bar <- "\t --------------------------------  \n"
     cat("\n+ Cells:", bar)
-    str(.get_all_names_with_host(".cells", objEnv), vec.len = VL)
+    ## str(.get_all_names_with_host(".cells", objEnv), vec.len = VL)
     cell_names <- ls(objEnv[[".cells"]], all.names = TRUE)
     rev_names <- strsplit(cell_names, ".", fixed = TRUE)
     rev_names <- sapply(rev_names, function(el) paste(rev(el), collapse = "."))

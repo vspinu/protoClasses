@@ -104,20 +104,17 @@ print(Y$ff)
 with(Y, e(ff))
 Y$expr(e(ff))
 
+Y$initForms(zz = form(
+              a1.cc.dd = form(
+                bb.cc = form(print(type))),
+              a2.b0 = form(z <- 34),
+              a3 = form(print(z + 100))))
+print(Y$zz)
 
+###_ CELLS
+x <- protoCell(type = "x", prot = "*",  expr = {appp <- 232323})
+ff <- protoCell(prototype = x, type = "ff")
 
-
-
-
-
-
-
-
-
-
-
-x <- new("protoCell", prot = "*", type = "x", expr = {appp <- 232323})
-y <- new("protoCell", prototype = x, type = "y")
 .infoCell(y)
 .installCellInContext(y, X)
 .infoCell(y)
@@ -157,10 +154,6 @@ x <- new("protoCell", type = "x")
 sys.parents.objects(X[[".fields"]])
 X
 new("protoCell", prototype = "bbb", homeContext = X, type = "pp")
-
-e <- new.env()
-e[["a"]] <- 333
-a <- 111
 
 setClass("myfunc",
          representation =

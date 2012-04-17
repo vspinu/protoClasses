@@ -187,16 +187,31 @@ setMethod("$<-",
 
 
 ###__ protoCell
-setClass("protoCell",
-         ## representation =
-         ## list(contextClass = "character"),
-         ## prototype = list(contextClass = "protoContext"),
-         contains = "envProtoClass")
+setClass("protoCell", contains = "envProtoClass")
 setMethod("initializeRoot", "protoCell",
           .initializeRoot_protoCell)
 
+protoCell <- function(
+               type = "--",
+               prototype = NULL,
+               fields = list(),
+               methods = list(),
+               forms = list(),
+               initFields = list(),
+               initMethods = list(),
+               initForms = list(),
+               expr = expression(),
+               rootParentEnv = NULL, ## todo:  make field
+               ...)
+    new("protoCell", type = type, prototype = prototype,
+        initMethods = initMethods, methods = methods,
+        initFields = initFields, fields = fields,
+        initForms = initForms, forms = forms,
+        expr = expr, ...)
+
 setMethod("installBinding", "protoCell",
           .installBinding_protoCell)
+
 
 ###__ protoContainer
 setClass("protoContainer",
@@ -286,7 +301,10 @@ setMethod("setPrototype", "protoContext",
           })
 
 
-
+.getPrototype <- function(cell)
+    as.environment(cell)[[".prototype"]]
+.setHomeContext <- function(cell, context)
+    as.environment(cell)[[".homeContext"]] <- context
 
 ## Rgraphvis functionality
 ## setAs("cellContainer", "graphNEL", .as_cellContainer_graphNEL)
