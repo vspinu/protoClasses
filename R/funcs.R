@@ -1,15 +1,41 @@
+##' The \code{protoClasses} package is an implementation of
+##' \href{http://en.wikipedia.org/wiki/Prototype-based_programming}{prototype} programming paradigm.
+##'
+##'
+##' Classes to support prototype-style classes with reference-semantics for
+##' fields, object-based methods, forms and cells.
+##'
+##' The implementation is a cross between \code{proto-package} and R's \code{refClasses}. 
+##'
+##' The "envProtoClass" is the basic class from which protoContext and protoCell
+##' are inhereted.
+##' @name protoClasses-package
+##' @docType package
+##' @title Prototype based programming with context and forms.
+##' @author Vitalie Spinu \email{spinuvit@@gmail.com}
+##' @keywords package prototype
+NULL
+.self <- NULL
 
 options(protoClasses = list(changeCallEnv = FALSE))
 ## if TRUE  eval(substitute(list(...)) gets rid of source code !!!
 ## fixme: !!
 
-## Classes to support POP-style classes with reference-semantics for fields
-## object-based methods, protoCells and qexps..
-## Implementation of the R-based version of these classes (using environments)
-
-## The "envProtoClass" is the basic class from which protoContext and protoCell
-## are inhereted.
-
+##' Create a class definition of a cell.
+##'
+##' \code{setCellClass} differs from \code{setClass} only in that class
+##' representation contains an additional slot \code{contextClass} to represent
+##' the default class of the cell's context.
+##' @param Class class name
+##' @param contextClass a string representing the context class with which this
+##' cell class is associated.
+##' @param contains what classes does this class extend. "protoCell" class is
+##' added automatically to this list.
+##' @param where see \code{\link{setClass}}
+##' @param ... other parameters to \code{\link{setClass}}
+##' @seealso \link{protoCell}, \link{protoContext}, \link{setContextClass}
+##' @author Vitalie Spinu
+##' @export
 setCellClass <- function(Class,
                          contextClass = "protoContext",
                          contains = character(),
@@ -28,8 +54,29 @@ setCellClass <- function(Class,
     Class
 }
 
+
+##' Create a class definition for a proto context.
+##'
+##' Proto contexts are main objects envProtoClass objects which allow building
+##' hierarchical inheritance in prototype OO programming. ProtoContext objects
+##' inherit form other protoContext objects in the sense that all methods,
+##' fields, forms and cells contained in parent object are also visible in the
+##' children contexts unless overwritten.
+##' @param Class  class name
+##' @param defaultContext an object inherited from \code{protoContext}. This is
+##' the context from which all the children contexts of the current class will
+##' inherit (in the sense of the prototype inheritance).
+##' @param cellClass class of the cells which populate this context class
+##' @param contains what classes this class extend. In addition to the default
+##' \code{protoContext} class.
+##' @param where where to install the class definition
+##' @param ... other arguments to \link{setClass}
+##' @seealso protoCell, protoContext, setContextClass
+##' @author Vitalie Spinu
+##' @export
+##'
 setContextClass <- function(Class,
-                            defaultContext = new("protoContext", type = paste("@", Class, sep = "")), ## not root by default
+                            defaultContext = new("protoContext", type = paste(Class, "@",  sep = "")), ## not root by default
                             cellClass = "protoCell",
                             contains = character(),
                             where = topenv(parent.frame()),
@@ -83,22 +130,19 @@ setContextClass <- function(Class,
 
 ##' Return TRUE if envProtoObj is a root object
 ##'
-##' @title
-##' @param envProtoObj
+##' @param envProtoObj Object from a subclass of envProtoClass
 ##' @author Vitalie Spinu
-##' @examples
+##' @export
 isRoot <- function(envProtoObj)
     exists(.rootMetaName, envir = as.environment(envProtoObj), inherits = FALSE)
 
 .signAsRoot <- function(envProtoObj)
     assign(.rootMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
 
-##' TRUE is it's a default context
+##' Return TRUE is it's a default context
 ##'
-##' @title
-##' @param envProtoObj
+##' @param envProtoObj Object from a subclass of envProtoClass
 ##' @author Vitalie Spinu
-##' @examples
 isDefaultContext <- function(envProtoObj)
     exists(.defaultMetaName, envir = as.environment(envProtoObj), inherits = FALSE)
 
@@ -134,6 +178,20 @@ newRoot <- function(Class, ...){
     objEnv[[".prototype"]] <- prototype
 }
 
+create_specialised_accesor <- function(type){
+    fun <- eval(substitute(
+                  function(value){
+                      if(missing(value))
+                          container_name
+                      else{
+                          if(!is(value, "environment") || !identical(as.environment(container_name), as.environment(value)))
+                              warning("Oops, trying to assing non-native container. Are you messing with internals through user interface?")
+                      }
+                  }, list(container_name = as.name(type))))
+    attributes(fun) <- NULL
+    fun
+}
+
 ###_ envProtoClass
 .initializeRoot_envProtoClass <- function(.Object,  ##TODO: !! get the "pure" initialization functionality into separate slot "initialize" in class definition!!
                                           initForms = list(),
@@ -143,14 +201,37 @@ newRoot <- function(Class, ...){
                                           ...){ #... not used here pu
     ## initialize the basic functionality for the ROOT object
     ## .fields, .prototype, basic methods etc
-    objEnv <- as.environment(.Object) ## todo: should be base-namespace??
+    objEnv <- as.environment(.Object)
     .signAsRoot(objEnv)
-    parent.env(objEnv) <- globalenv()  ## if cell,   will have non empty parent
-    ## tothink: lock these fields?
-    objEnv[[".fields"]] <- new("protoContainer", typeContainer = ".fields") ## emptyenv as parent by default
-    objEnv[[".methods"]] <- new("protoContainer", typeContainer = ".methods")
-    objEnv[[".forms"]] <- new("protoContainer", typeContainer = ".forms")
-    .initFields(list(type = type), where = objEnv)
+    parent.env(objEnv) <- topenv()  ## tohink: should be the namespace of protoClasses package ?
+    ## tothink: lock these fields? 
+    objEnv[[".fields"]] <- new("fieldContainer", host = .Object) ## emptyenv as parent by default
+    objEnv[[".methods"]] <- new("methodContainer", host = .Object)
+    objEnv[[".forms"]] <- new("formContainer", host = .Object)
+    ## SPECIALS
+    .insertSpecial(objEnv, self = .Object, prototype=NULL)
+    objEnv[[".root"]] <- .Object
+
+    ## BASIC FIELDS
+    .initFields(list(type = protoField(
+                       function(value){
+                           if(missing(value))
+                               .type
+                           else assign(".type", .replaceDots(as.character(value)), .self)
+                       }),
+                     Type = protoField(
+                       function(value){
+                           if(missing(value))
+                               .getType(.self)
+                           else stop("Cannot assign extended type.")
+                       }),
+                     m = protoField(create_specialised_accesor(".methods")),
+                     f = protoField(create_specialised_accesor(".fields")),
+                     h = protoField(create_specialised_accesor(".forms"))),
+                where = objEnv)
+    .setField(objEnv, "type", type)
+
+    ## BASIC METHODS
     .initMethods(list(
                    initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
                        dots <-
@@ -172,22 +253,22 @@ newRoot <- function(Class, ...){
                            }else  c(list(...), .list)
                        .initFields(dots, .self, .classes)
                    },
-                   setFields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                   setFields = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
                        dots <-
-                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                           else list(...)
+                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                           else c(list(...), .list)
                        .generic_setter(dots, .self, ".fields")
                    },
-                   initForms = function(..., after = NULL, changeCallEnv = getOption("protoClasses")$changeCallEnv) {
+                   initForms = function(..., .list = list(), after = NULL,  changeCallEnv = getOption("protoClasses")$changeCallEnv) {
                        dots <-
-                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                           else  list(...)
+                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                           else c(list(...), .list)
                        .initForms(dots, .self, after = after)
                    },
-                   setForms = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                   setForms = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
                        dots <-
-                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                           else list(...)
+                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                           else c(list(...), .list)
                        .generic_setter(dots, .self, ".forms")
                    },
                    methods = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
@@ -213,9 +294,6 @@ newRoot <- function(Class, ...){
                    }),
                  where = objEnv)
 
-    ## SPECIALS
-    .insertSpecial(objEnv, self = .Object, prototype=NULL)
-    objEnv[[".root"]] <- .Object
 
     ## "USER" FIELDS:
     .initFields(initFields, .Object)
@@ -226,7 +304,7 @@ newRoot <- function(Class, ...){
 
 ## .dummy_envProtoObject <- newRoot("envProtoClass")
 .initialize_envProtoClass <- function(.Object,
-                                      prototype = newRoot("envProtoClass"),
+                                      prototype = newRoot("envProtoClass"), ## tothink: what a heck is this here?
                                       type = "--",
                                       initMethods = list(), initFields = list(), initForms = list(),
                                       methods = list(), fields = list(), forms = list(),
@@ -245,15 +323,18 @@ newRoot <- function(Class, ...){
     parent.env(objEnv) <-
         protoEnv <- as.environment(prototype)
 
-    ## FUNDAMENTAL CONTAINERS:
-    objEnv[[".fields"]] <- new("protoContainer", parentContainer = protoEnv[[".fields"]], typeContainer = ".fields")
-    objEnv[[".methods"]] <-new("protoContainer", parentContainer = protoEnv[[".methods"]], typeContainer = ".methods")
-    objEnv[[".forms"]] <- new("protoContainer",  parentContainer = protoEnv[[".forms"]], typeContainer = ".forms")
 
     ## SPECIALS
-    .insertSpecial(objEnv, self= .Object, prototype = prototype)
-    .setField(.Object, "type", type) # type field was initialized  in the root
+    .insertSpecial(objEnv, self = .Object, prototype = prototype)
 
+    ## FUNDAMENTAL CONTAINERS:
+    objEnv[[".fields"]] <- new("fieldContainer",  host = .Object)
+    objEnv[[".methods"]] <-new("methodContainer", host = .Object)
+    objEnv[[".forms"]] <- new("formContainer",  host = .Object)
+
+    ## DEFAULTS
+    .setField(.Object, "type", type) # type field was initialized  in the root
+    
     ## USER supplied INITS
     if(changeCallEnv){
         initFields <- eval(substitute(initFields), envir = objEnv)
@@ -278,7 +359,7 @@ newRoot <- function(Class, ...){
                                          initCells = list(), ...){
     .Object <- callNextMethod(.Object, ...) ##envProtoClass
     objEnv <- as.environment(.Object)
-    objEnv[[".cells"]] <-  new("cellContainer", typeContainer = ".cells") ## empty parent by default
+    objEnv[[".cells"]] <-  new("cellContainer", host = .Object) ## empty parent by default
     objEnv[[".rootParentEnv"]] <- rootParentEnv
     .initMethods(list(initCells =
                       function(...){
@@ -286,7 +367,7 @@ newRoot <- function(Class, ...){
                           dots <- list(...)
                           for(i in seq_along(dots)){
                               ## infer the "type" of the cell from the names if type == "--"
-                              if(is.name(dotsq[[i + 1L]]) && is(dots[[i]], "protoCell")&& .type(dots[[i]]) == "--")
+                              if(is.name(dotsq[[i + 1L]]) && is(dots[[i]], "protoCell")&& .getType(dots[[i]]) == "--")
                                   ## names of ... have precedence over type!!
                                   ## can not touch them here!
                                   dots[[i]] <- .setType(dots[[i]], as.character(dotsq[[i + 1L]]))
@@ -317,9 +398,7 @@ newRoot <- function(Class, ...){
 
     ## Cells
     parent.cells <- get(".cells", envir = prototype, inherits = FALSE)
-    objEnv[[".cells"]] <-  new("cellContainer",
-                               parentContainer = parent.cells,
-                               typeContainer = ".cells")
+    objEnv[[".cells"]] <-  new("cellContainer", parentContainer = parent.cells, host = .Object)
     objEnv[[".self"]] <- .Object
     objEnv[[".rootParentEnv"]] <-
         if(is.null(rootParentEnv))
@@ -377,7 +456,7 @@ newRoot <- function(Class, ...){
 
     ## CREATE THE CELL
     type <- as.character(type)
-    ## type_long <- paste(type, .type(prototype), sep = ".")
+    ## type_long <- paste(type, .getType(prototype), sep = ".")
     ## the_cell <-
     ## if(is.null(homeContext)){ # default context
     ##     ## lookup in DEFAULT .cells!!
@@ -398,7 +477,7 @@ newRoot <- function(Class, ...){
     ##     ## type_long is FOUND so  CLONE:
     ##     the_cell <- get(type_long, envi = parent.env(.cells))
     ##     obj <- as.environment(clone(the_cell))
-    ##     ## REDIRECT parents of containers   ## note: no problems with cloning * cell; it's just not allowed to create *
+    ##     ## REDIRECT parents of containers ## note: no problems with cloning * cell; it's just not allowed to create *
     ##     parent.env(get(".forms", envir = obj)) <- get(".forms", envir = prototype)
     ##     parent.env(get(".methods", envir = obj)) <- get(".methods", envir = prototype)
     ##     parent.env(get(".fields", envir = obj)) <- get(".fields", envir = prototype)
@@ -494,8 +573,11 @@ as.form <- function(from){
 ## as.form(as.expression(c(expression(232 - 342), Bbb = quote(343 - 3))))
 
 isValidProtoObject <- function(object, trigger_error = FALSE, object_name = "Object"){
+    if(!inherits(object, "envProtoClass"))
+        stop("Object is not of class 'envProtoClass'. Suplied object's class: '", class(object),"'")
+    ## this sucks:
     checks <-
-        c(`Object is not of class "envProtoClass"` = is(object, "envProtoClass"),
+        c(
           `Empty environments are not allowed` = !identical(emptyenv(), as.environment(object)),
           `.prototype object not found` = exists(".prototype", envir = as.environment(object), inherits = FALSE),
           `.self object not found`  = exists(".self", envir = as.environment(object), inherits = FALSE),
@@ -591,13 +673,13 @@ isECall <- function(obj){
     }
     if(do_assign){
         assign(formName, newForm, envir = where)
-        .installBinding_default(new("formInfo", formClass = class(newForm)),
-                                where, formName, ".forms")
+        .installBinding_default(new("protoFormInfo", formClass = class(newForm)),
+                                container = where[[".forms"]], formName)
     }
     do_assign
 }
 
-.installBinding_protoForm <- function(bindInfo, where, bindName, container = ".forms",
+.installBinding_protoForm <- function(bindInfo, container, bindName,
                                       after = NULL, returnBinding = bindName){
     ## * Used recursively:
     ## if bindInfo is form - assign in the whereEnv
@@ -608,11 +690,11 @@ isECall <- function(obj){
     ## and install the eform e(aa.bb.cc) into aa.bb with the name "cc" and
     ## e(aa.bb) into "aa" with the name "bb".
     ## * If bindInfo == NULL then all the children forms ("aa.bb.cc.dd" etc) and
-    ## this form are removed from WHERE
+    ## this form are removed from CONTAINER
     ## * if AFTER is nonnull it must be character or an integer specifying
     ## the position of the new form "cc" in the parent form "aa.bb"
 
-    whereEnv <- as.environment(where)
+    whereEnv <- as.environment(container@host)
     form <- bindInfo
 
     ## bindName is aa.bb.cc
@@ -642,7 +724,7 @@ isECall <- function(obj){
         for(i in seq_along(firstNames))
             newForm[[firstNames[[i]]]] <-
                 ## if a form install, if expression just return
-                .installBinding_protoForm(form[[i]], whereEnv, longNames[[i]],
+                .installBinding_protoForm(form[[i]], container, longNames[[i]],
                                           returnBinding = paste(bindName, firstNames[[i]], sep = "."))
         # -------------------------------------------------------------- #
         # install newForm only if different                              #
@@ -651,8 +733,8 @@ isECall <- function(obj){
         # if(!identical(newForm, oldForm)){                              #
         # -------------------------------------------------------------- #
         assign(bindName, newForm, envir = whereEnv)
-        .installBinding_default(new("formInfo", formClass = class(form)),
-                                whereEnv, bindName, ".forms")
+        .installBinding_default(new("protoFormInfo", formClass = class(form)),
+                                container, bindName, ".forms")
         return(.makeEexpr(returnBinding))
     }else{
         ## .assignForm should no be used directly to assign non protoForm objects !!
@@ -687,7 +769,7 @@ isECall <- function(obj){
     ## install all bindings and update the container
     formNames <- names(forms)
     for(i in seq_along(forms))
-        installBinding(forms[[i]], where, formNames[[i]], ".forms", after = after)
+        installBinding(forms[[i]], whereEnv[[".forms"]], formNames[[i]], after = after)
     return(invisible(formNames))
 }
 
@@ -749,100 +831,105 @@ isECall <- function(obj){
 
 
 ###_  * GETTERS
-.existsMethod <- function(name, selfEnv){
-    exists(name, envir = selfEnv[[".methods"]])
+## .existsMethod <- function(name, selfEnv){
+##     exists(name, envir = selfEnv[[".methods"]])
+## }
+.dollarGet_methodContainer <- function(x, name){
+    meth <- get(name, envir = x)
+    environment(meth) <- x@host
+    if(meth@changeCallEnv) meth <- x@host[[".PROTOZIZE"]](meth)
+    meth
 }
-
-.getMethod <- function(name, selfEnv)
+.getMethod <- function(name, selfEnv){
     if(exists(name, envir = selfEnv[[".methods"]])){
-        meth <- get(name, envir = selfEnv[[".methods"]])
-        environment(meth) <- selfEnv
-        if(meth@changeCallEnv) meth <- selfEnv[[".PROTOZIZE"]](meth)
-        meth
+        .dollarGet_methodContainer(selfEnv[[".methods"]], name)
+    }else{
+        substitute()
+    }
+}
+
+## .existsField <- function(name, selfEnv){
+##     exists(name, envir = selfEnv[[".fields"]])
+## }
+
+.dollarGet_fieldContainer <- function(x,name){
+    field_fun <- get(name, envir = x)
+    environment(field_fun) <- x@host
+    field_fun()
+}
+.getField <- function(name, selfEnv, error = FALSE)
+    if(exists(name, envir = selfEnv[[".fields"]])){
+        .dollarGet_fieldContainer(selfEnv[[".fields"]], name)
     }else{
         substitute()
     }
 
-.existsField <- function(name, selfEnv){
-    exists(name, envir = selfEnv[[".fields"]])
-}
-.getField <- function(name, selfEnv)
-    if(exists(name, envir = selfEnv[[".fields"]])){
-        field_fun <- get(name, envir = selfEnv[[".fields"]])
-        environment(field_fun) <- selfEnv
-        field_fun()
-    }else{
-        substitute()
-    }
 
-.getFieldFunction <- function(name, selfEnv){
-    "Gets the function execute when the fields is requested"
-    if(exists(name, envir = selfEnv[[".fields"]])){
-        field_fun <- get(name, envir = selfEnv[[".fields"]])
-        environment(field_fun) <- selfEnv
-        field_fun
-    }else{
-        NULL
-    }
-}
-
-.existsForm <- function(name, selfEnv){
-    exists(name, envir = selfEnv[[".forms"]])
-}
-
+## .existsForm <- function(name, selfEnv){
+##     exists(name, envir = selfEnv[[".forms"]])
+## }
+.dollarGet_formContainer <- function(x, name)
+    new("protoFormWithEnv", get(name, envir = x), environment = x@host)
 .getForm <- function(name, selfEnv)
     if(exists(name, envir = selfEnv[[".forms"]])){
-        new("protoFormWithEnv", get(name, envir = selfEnv), environment = selfEnv)
+        .dollarGet_formContainer(selfEnv[[".forms"]],name)
     }else{
         substitute()
     }
+    
 
-
-.existsCell <- function(name, selfEnv){
-    exists(name, envir = selfEnv[[".cells"]])
-}
-
-
+## .existsCell <- function(name, selfEnv){
+##     exists(name, envir = selfEnv[[".cells"]])
+## }
 ## .existsPartialCell <- function(name, selfEnv){
 ##     .existsPartial(name, selfEnv[[".cells"]])
 ## }
 
+.dollarGet_cellContainer <- function(x, name)
+    .getPartial(name, x)
 .getCell <- function(name, selfEnv){
     .cells <- as.environment(selfEnv[[".cells"]])
     .getPartial(name, .cells, trigger_error = FALSE)
 }
 
+.getPrototype <- function(cell)
+    as.environment(cell)[[".prototype"]]
+.setHomeContext <- function(cell, context)
+    assign(".homeContext", context, as.environment(cell))
+
+
 ###_  * SETTERS
 ## SET new value only if the object already exists in the hierarchy
-.setField <- function(x, name, value){ # must follow dollar arguments, dont realy like this :(
-    .fields <- get(".fields", envir = x)
-    if(exists(name, envir = .fields)){
-        field_fun <- get(name, envir = .fields)
-        environment(field_fun) <- as.environment(x)
+.dollarSet_fieldContainer <- function(x, name, value, error = TRUE)
+    if(exists(name, envir = x)){
+        field_fun <- get(name, envir = x)
+        environment(field_fun) <- x@host
         field_fun(value) ## side effect here (must assign to environment)
         return(x)
     }else{
-        stop("Object \"", name, "\" is not a valid field in the protoObject of type \"", .type(x), "\"")
+        if(error) stop("Object \"", name, "\" is not a valid field in the protoObject of type \"", .getType(x@host), "\"")
+        else substitute()
     }
-}
+.setField <- function(x, name, value, error = TRUE)
+    .dollarSet_fieldContainer(get(".fields", envir = x), name, value, error)
 
-.setMethod <- function(x, name, value){
-    .methods <- get(".methods", envir = x)
-    if(exists(name, envir = .methods)){
+.dollarSet_methodContainer <- function(x, name, value, error = TRUE)
+    if(exists(name, envir = x)){
         ## oldMeth <- get(name, envir = x) ;; need to compare with an old one really?  probably not
         if(!is.function(value))
             stop("Methods must be functions. Not true for '", name, "'")
         method <- new("protoMethod", value)
-        installBinding(method, x, name, ".methods")
+        installBinding(method, x, name)
+        return(x)
     }else{
-        stop("Object \"", name, "\" is not a valid method in the protoObject of type \"", .type(x), "\"")
+        if(error) stop("Object \"", name, "\" is not a valid method in the protoObject of type \"", .getType(x@host), "\"")
+        else substitute()
     }
-}
+.setMethod <- function(x, name, value, error = TRUE)
+    .dollarSet_methodContainer(get(".methods", envir = x), name, value, error)
 
-.setForm <- function(x, name, value, after = NULL){
-    ## after must be a character or position
-    .forms <- get(".forms", envir = x)
-    if(exists(name, envir = .forms)){
+.dollarSet_formContainer <- function(x, name, value, error = TRUE, after = NULL){
+    if(exists(name, envir = x)){
         oldForm <- get(name, envir = x)
         is_eCall <- unlist(sapply(oldForm, isECall))
         shortNames <- names(oldForm)
@@ -856,12 +943,20 @@ isECall <- function(obj){
         })
         value <- as(value, "protoForm")
         if(!identical(oldForm@.Data, value@.Data))
-            installBinding(value, x, name, ".forms")
+            installBinding(value, x, name)
+        return(x)
     }else{
-        stop("Object ", name, " is not a valid form in the protoObject of type \"", get("type", x), "\"")
+        if(error) stop("Object ", name, " is not a valid form in the protoObject of type \"", get("type", x@host), "\"")
+        else substitute()
     }
 }
-.setCell <- function(x, name, value){}
+.setForm <- function(x, name, value, after = NULL, error = TRUE){
+    .dollarSet_formContainer(get(".forms", envir = x), name, value, after, error)
+}
+
+.setCell <- function(x, name, value, error = TRUE){
+    stop("Not implemented yet")
+}
 
 ###_  * KILLERS
 .removeFormWithChildren <- function(name, selfEnv){
@@ -907,13 +1002,25 @@ If name is aa.bb, all the registered forms starting with aa.bb will
         if(missing(out)){
             out <- .getForm(name, selfEnv)
             if(missing(out))
-                stop("Cannot find object \"", name, "\" in the protoObject of type ", .type(x))
+                stop("Cannot find object \"", name, "\" in the protoObject of type ", .getType(x))
         }
     }
     out
 }
 
-.dollarSet_envProtoClass <- .setField ## todo? forms
+.dollarSet_envProtoClass <- function(x, name, value){
+    out <- .setMethod(x, name, value, error=FALSE)
+    if(missing(out)){
+        out <- .setField(x, name, value, error = FALSE)
+        if(missing(out)){
+            out <- .setForm(x, name, value, error = FALSE)
+            if(missing(out))
+                stop("\"", name, "\" is not a valid object in the protoObject of type '", .getType(x), "'")
+        }
+    }
+    out
+}
+
 .dollarGet_protoContext <- function(x, name){
     if(!is.null(obj <- .getCell(name, as.environment(x))))
         return(obj)
@@ -922,20 +1029,12 @@ If name is aa.bb, all the registered forms starting with aa.bb will
 }
 
 .dollarSet_protoContext <- function(x, name, value){ # must follow dollar arguments, dont realy like this :(
-    .fields <- get(".fields", envir = x)
     .cells <- get(".cells", envir = x)
     match <- .complete_partial_name(name, .cells)
-    if(!(is.na(match)||match == 0L)){
-        if(!is(value, "protoCell"))
-            stop(gettextf("cannot assign an object of class \"%s\" as a cell \"%s\"",
-                          class(value), match))
+    if(is(value, "protoCell") && !(is.na(match) || match == 0L)){
         assign(match, value, envir = .cells)
-    }else if(exists(name, envir = .fields)){
-        field_fun <- get(name, envir = .fields)
-        environment(field_fun) <- as.environment(x)
-        field_fun(value) ## side effect here (must assign to environment)
     }else{
-        stop("Object \"", name, "\" is not a valid cell or field  in the protoContext of type \"", .type(x), "\"")
+        .dollarSet_envProtoClass(x, name, value)
     }
     invisible(x)
 }
@@ -1055,7 +1154,7 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     for(i in seq_along(fieldNames)){
         field <-
             if(extends(fieldClasses[[i]], "protoField")){
-                ## protoField is suplied, thus don't assign initial value in WHERE
+                ## protoField is suplied; don't assign initial value in WHERE
                 new("protoField", fieldInits[[i]], bindName = fieldNames[[i]])
             }else{
                 if(!isVirtualClass(fieldClasses[[i]]))
@@ -1064,7 +1163,7 @@ If name is aa.bb, all the registered forms starting with aa.bb will
                     bindName = fieldNames[[i]],
                     className = fieldClasses[[i]])
             }
-        installBinding(field, whereEnv, fieldNames[[i]], ".fields")
+        installBinding(field, whereEnv[[".fields"]], fieldNames[[i]])
     }
     invisible(fieldNames)
 }
@@ -1091,7 +1190,7 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     ## install in container
     for(i in seq_along(methods)){
         method <- new("protoMethod", methods[[i]])
-        installBinding(method, whereEnv, methodNames[[i]], ".methods")
+        installBinding(method, whereEnv[[".methods"]], methodNames[[i]])
     }
     return(methodNames)
 }
@@ -1110,9 +1209,9 @@ If name is aa.bb, all the registered forms starting with aa.bb will
         if(!all(sapply(cells, function(el)
                        is.null(el) ||
                        is(el, "protoCell") ||
-                       is(el, "cellInfo") ||
+                       is(el, "protoCellInfo") ||
                        is(el, "character")))) ## must be one of existing cells! don't create a new cell!!
-            stop("Argument for initCells must be of class  \"protoCell\" , \"cellInfo\" or \"character\" vector of existing types")
+            stop("Argument for initCells must be of class  \"protoCell\" , \"protoCellInfo\" or \"character\" vector of existing types")
     }
     else
         stop(gettextf("cells arguement must must be a list got an object of class \"%s\"",
@@ -1131,21 +1230,22 @@ If name is aa.bb, all the registered forms starting with aa.bb will
             ## install from inhereted contexts ## canot use 'new', it can not produce "*" cell
             cells[[i]] <- .getPartial(cells[[i]], get(".cells", envir = whereEnv), object_name = "cell") # error if not found
         ##names have precedence over types here (types should not be used explicitly at user level)
-        installBinding(cells[[i]], where, cellTypes[[i]], ".cells")
+        installBinding(cells[[i]], whereEnv[[".cells"]], cellTypes[[i]])
     }
     return(invisible(cellTypes))
 }
 
-.installCellInContext <- function(cell, context, container = ".cells"){
+.installCellInContext <- function(cell, container){
     ## CELL and PROTOTYPES are cloned if not homeless or not already  associated
     ## with CONTEXT.
     ## CELL and missing PROTOTYPES are inserted into the container (i.e. prototype
     ## chain is followed as long as proto_type is not found in current context).
-    .to_clone <- function(cell) #, context)
+    .to_clone <- function(cell, context)
         ## CLONE if not (homeless or associated with context)
         !(is.null(homeContext(cell)) || identical(as.environment(context),
                                                   as.environment(homeContext(cell))))
     stopifnot(is(cell, "protoCell"))
+    context <- container@host
     if(!is(context, tCls <- getClassDef(class(cell))@contextClass))
         stop(gettextf("Suplied context class /%s/ does not extend the default context class of the cell /%s/",
                       class(context), tCls))
@@ -1154,28 +1254,28 @@ If name is aa.bb, all the registered forms starting with aa.bb will
         cell <- clone(cell)
     if(!extends(class(cell), tCls <- getClassDef(class(context))@cellClass))
         cell <- as(cell, tCls)  ## note: some functionality might be missing, provide explicit coerce method.
-    containerEnv <- as.environment(contextEnv[[container]])
-    if(identical("--", as.environment(cell)[["type"]]))
+    containerEnv <- as.environment(container)
+    if(identical("--", as.environment(cell)[[".type"]]))
         stop("Cannot install cell of type \"--\"; please supply the type argument.")
 
     ## KEEP CLONING and INSERTING  prototypes when not in the container
     cell_to_return <- cell
     prototype <- .getPrototype(cell)
     while(!is.null(prototype) &&
-          !exists(prot_type <- .type(prototype),
+          !exists(prot_type <- .getType(prototype),
                   envir = containerEnv, inherits = FALSE)){
-        containerEnv[[.type(cell)]] <- cell
+        containerEnv[[.getType(cell)]] <- cell
         .redirect_prototypes(cell, containerEnv)
         .setHomeContext(cell, context)
         setPrototype(cell, ## sets parent.env as well
-                     if(.to_clone(prototype)) clone(prototype)
+                     if(.to_clone(prototype, context)) clone(prototype)
                      else prototype )
         ## ------
         cell <- .getPrototype(cell)
         prototype <- .getPrototype(cell)
     }
     ## if cell is already in container, nothing changes
-    containerEnv[[.type(cell)]] <- cell
+    containerEnv[[.getType(cell)]] <- cell
     .redirect_prototypes(cell, containerEnv)
     .setHomeContext(cell, context)
     if(is.null(prototype)){ ## root
@@ -1189,25 +1289,25 @@ If name is aa.bb, all the registered forms starting with aa.bb will
 }
 
 .redirect_prototypes <- function(prototype, container){
-    ##make all the cells which point to .type(prototype) to point to new prototype
-    prot_type <- .type(prototype)
+    ##make all the cells which point to .getType(prototype) to point to new prototype
+    prot_type <- .getType(prototype)
     lapply(ls(container, all.names = TRUE), function(nm){
         cell <- get(nm, envir = container, inherits = FALSE)
-        if(identical(.type(get(".prototype", envir = cell)), prot_type))
+        if(identical(.getType(get(".prototype", envir = cell)), prot_type))
             setPrototype(cell, prototype)
     })
 }
 
-cellFromInfo <- function(cellInfo, homeContext){
-    stopifnot(is(cellInfo, "cellInfo"))
+cellFromInfo <- function(protoCellInfo, homeContext){
+    stopifnot(is(protoCellInfo, "protoCellInfo"))
     ## infer name! SIDE EFFECT (does not work here,  this func is called usually  internally)
-    ## nameCell <- substitute(cellInfo)
-    ## if(is.name(nameCell) && identical(cellInfo[["type"]], "--"))
-    ##     cellInfo[["type"]] <- as.character(nameCell)
-    if(is(cellInfo$prototype, "cellInfo"))
-        cellInfo[["prototype"]] <- cellFromInfo(cellInfo$prototype, homeContext)
-    cellInfo[["homeContext"]] <- homeContext
-    do.call("new", c(list(Class = cellInfo@cellClass), cellInfo))
+    ## nameCell <- substitute(protoCellInfo)
+    ## if(is.name(nameCell) && identical(protoCellInfo[["type"]], "--"))
+    ##     protoCellInfo[["type"]] <- as.character(nameCell)
+    if(is(protoCellInfo$prototype, "protoCellInfo"))
+        protoCellInfo[["prototype"]] <- cellFromInfo(protoCellInfo$prototype, homeContext)
+    protoCellInfo[["homeContext"]] <- homeContext
+    do.call("new", c(list(Class = protoCellInfo@cellClass), protoCellInfo))
 }
 
 homeContext <- function(cell)
@@ -1216,34 +1316,32 @@ homeContext <- function(cell)
 C <- function(...){
     args <- list(...)
     args[["Class"]] <- NULL
-    new("cellInfo", args, cellClass = "protoCell")
+    new("protoCellInfo", args, cellClass = "protoCell")
 }
 
-.installBinding_default <- function(bindInfo, where, bindName, container, ...){
+.installBinding_default <- function(bindInfo, container, bindName, ...){
     ## default methods just assigns the stuff in the container.
-    containerEnv <- as.environment(get(container, envir = where, inherits = FALSE))
-    assign(bindName, bindInfo, envir = containerEnv)
+    assign(bindName, bindInfo, envir = container)
 }
 
-.installBinding_protoCell <- function(bindInfo, where, bindName, container = ".cells", ...){
+.installBinding_protoCell <- function(bindInfo, container, bindName, ...){
     ## bindName has precedence:
     if(!missing(bindName) && !identical(bindName, ""))
         assign("type", bindName, envir = bindInfo)
     else
         bindName <- get("type", envir = bindInfo)
-    .installCellInContext(bindInfo, where, container)
+    .installCellInContext(bindInfo, container = container)
 }
 
-.installBinding_cellInfo <- function(bindInfo, where, bindName, container = ".cells", ...){
+.installBinding_protoCellInfo <- function(bindInfo, container, bindName, ...){
     if(!missing(bindName) && !identical(bindName, ""))
         bindInfo[["type"]] <- bindName
-    ## if(!is(where, "protoContext")) stop("Argument \"where\" is not a subclass of \"protoContext\"")
-    new_cell <- cellFromInfo(bindInfo, homeContext = where)
-    installBinding(new_cell, where, bindName, container = container)
+    new_cell <- cellFromInfo(bindInfo, homeContext = container@host)
+    installBinding(new_cell, container, bindName)
     invisible(new_cell)
 }
 
-.installBinding_protoField <- function(bindInfo, where, bindName, container, ...){
+.installBinding_protoField <- function(bindInfo, container, bindName, ...){
     ## assign if different
     ## containerEnv <- get(container, envir = where)
     ## if(exists(bindName, envir = containerEnv)){
@@ -1259,7 +1357,7 @@ C <- function(...){
     ## environments of ALL functions from envir is changed to ENVIR
     ## todo: make changeThisOnly argument
     envir <- as.environment(envir)
-    all.names <- ls(envir, all = T)
+    all.names <- ls(envir, all.names = T)
     lapply(all.names, function(nm)
            if(is.function(envir[[nm]])) environment(envir[[nm]]) <- envir
            )
@@ -1273,7 +1371,7 @@ C <- function(...){
     envir <- as.environment(envir)
     if(!(is(changeThisOnly, "environment") || is.null(changeThisOnly)))
         stop("changeThisOnly must be NULL or of subclass of 'environment', suplied an object of class ", class(changeThisOnly))
-    all.names <- ls(envir, all = T)
+    all.names <- ls(envir, all.names =  T)
     lapply(all.names, function(nm)
            if(is(envir[[nm]], "environment" ) && (is.null(changeThisOnly) ||
                                                   identical(parent.env(envir[[nm]]), as.environment(changeThisOnly))))
@@ -1281,6 +1379,13 @@ C <- function(...){
     invisible(NULL)
 }
 
+.changeContainersHosts <- function(host){
+    envir <- as.environment(host)
+    all_names <- ls(envir, all.names=T)
+    sapply(all_names, function(nm)
+           if(is(envir[[nm]], "protoContainer")) envir[[nm]]@host <- host)
+}
+    
 ###_  * CLONES(no side effects)
 .clone_envProtoClass <- function(x, exclude_names = c(), ...){
     ## exclude names are not cloned or copied (ex. .cells in protoContext class)
@@ -1309,34 +1414,35 @@ C <- function(...){
 
     .changeEnvFuncs(yEnv) ## fixme: should change environments only of those which point to xEnv!!!
     .changeEnvEnvs(yEnv, changeThisOnly = xEnv)
+    .changeContainersHosts(y) ## make .self of containers to point to "y" object
     lapply(xEnv[[".cloneLast"]], eval, envir = yEnv)
     return(y)
 }
 
 .clone_protoContainer <- function(x, exclude_names = c(), ...){
-    ## ATTENTION: !!!!
-    ## cloning of containers  will *not*  change the parent of the clone
-    ## it's your task to change that to point elsewhere in the program
+    ## ATTENTION: !!!! cloning of containers will *not* change the parent of the
+    ## clone, nor the .self it's your task to change that to point elsewhere in
+    ## the program (so far only needed in cloning envProtoObjects
+    exclude_names <- c(exclude_names, ".self")
     y <- x
     xEnv <- as.environment(x)
     y@.xData <- yEnv <- new.env(TRUE, parent = parent.env(x))
     x_names <- ls(envir=xEnv, all.names=TRUE)
     x_names <- x_names[!(x_names %in% exclude_names)]
-    lapply(x_names, function(nm) assign(nm,
-                                        value=clone(xEnv[[nm]], ...),
-                                        envir=yEnv))
+    lapply(x_names,
+           function(nm) assign(nm, value=clone(xEnv[[nm]], ...), envir=yEnv))
     y
 }
 
 .clone_cellContainer <- function(x, exclude_names = c(), ...){
-    ## .cells are not cloned, a new container is always created
+    ## .cells are ???not???? cloned, a new container is always created
     ## tothink:might be necessary for complete replication
     y <- callNextMethod()
     cell_names <- ls(y, all.names = TRUE)
     ## redirect new chells to new prototypes
     lapply(cell_names, function(nm){
         if(!isRoot(y[[nm]])){
-            tp <- .type(y[[nm]][[".prototype"]])
+            tp <- .getType(y[[nm]][[".prototype"]])
             prot <- y[[tp]]
             if(!is.null(prot)){
                 parent.env(y[[nm]]) <- y[[nm]][[".prototype"]] <- prot
@@ -1382,8 +1488,8 @@ C <- function(...){
 areIdentical <- function(c1, c2){
     ##  comapre two envProtoObjects
     reserved <- c( ".fields", ".forms", ".homeContext", ".methods", ".prototype", ".self",  ".cells", ".protozize", ".PROTOZIZE", "e")
-    names1 <- ls(c1, all = T)
-    names2 <- ls(c2, all = T)
+    names1 <- ls(c1, all.names =  T)
+    names2 <- ls(c2, all.names =  T)
     if(length(diff1 <- setdiff(setdiff(names1, names2), reserved)))
         message("folowing names are found in c1 and not c2: \n",
                 paste(diff1, collapse = ", "))
@@ -1404,8 +1510,8 @@ areIdentical <- function(c1, c2){
 }
 
 areIdenticalPBM <- function(pbm1, pbm2){
-    names1 <- ls(pbm1[[".cells"]], all = T)
-    names2 <- ls(pbm2[[".cells"]], all = T)
+    names1 <- ls(pbm1[[".cells"]], all.names =  T)
+    names2 <- ls(pbm2[[".cells"]], all.names =  T)
     reserved <- character()
     if(length(diff1 <- setdiff(setdiff(names1, names2), reserved)))
         message("folowing cells are found in pbm1 and  not in pbm2: \n",
@@ -1444,20 +1550,20 @@ areIdenticalPBM <- function(pbm1, pbm2){
     callNextMethod()
     ## Show the context in the future  here (todo)
     objEnv <- as.environment(object)
-    cat(" Type: \"", .type(object), "\"\n", sep = "")
+    cat(" Type: \"", .getType(object), "\"\n", sep = "")
     methods:::.printNames("All objects: ", ls(objEnv, all.names = TRUE))
     methods:::.printNames("Is Root: ", isRoot(object))
     VL <- 50
     bar <- "\t  --------------------------------  \n"
     cat(" Containers:\n")
     cat(" \n+ Fields:", bar)
-    str(.get_all_names_with_host(".fields", objEnv), vec.len = VL)
+    str(.get_all_names_with_host(object[[".fields"]]), vec.len = VL)
     ## print(.infoContainer(.get_all_names(objEnv[[".fields"]]), objEnv, ".fields"))
     cat(" \n+ Methods:", bar)
-    str(.get_all_names_with_host(".methods", objEnv), vec.len = VL)
+    str(.get_all_names_with_host(object[[".methods"]]), vec.len = VL)
     ## print(.infoContainer(.get_all_names(objEnv[[".methods"]]), objEnv, ".methods"))
     cat(" \n+ Forms:", bar)
-    str(.get_all_names_with_host(".forms", objEnv), vec.len = VL)
+    str(.get_all_names_with_host(object[[".forms"]]), vec.len = VL)
     ## for forms look in objEnv directly:
     ## print(.infoForms(objEnv))
     ## str(list(Fields =  .get_all_names(objEnv[[".fields"]]),
@@ -1485,8 +1591,9 @@ areIdenticalPBM <- function(pbm1, pbm2){
 
 
 .show_Container <- function(object){
-    callNextMethod()
-    methods:::.printNames("Contains: ", ls(as.environment(object), all.names = TRUE))
+    ## callNextMethod()
+    cat(gettextf("A container of class \"%s\"\n", class(object)))
+    methods:::.printNames("Contains: ", .get_all_names(object))
 }
 
 .print_ProtoFormWithEnv <- function(x, code = TRUE, ...){
@@ -1557,7 +1664,7 @@ areIdenticalPBM <- function(pbm1, pbm2){
 .debugForm <- function(form_name, where){
     form <- .getForm(form_name, where)
     if(missing(form))
-        stop("Form \"", form_name, "\" is not found in the cell of type \"", .type(where), "\"")
+        stop("Form \"", form_name, "\" is not found in the cell of type \"", .getType(where), "\"")
     form_browser <- .insertBrowserInForm(form)
     form_browser@hostEnv <- where
     form_browser@isInHost <- exists(form_name, envir = where, inherits = FALSE)
@@ -1568,7 +1675,7 @@ areIdenticalPBM <- function(pbm1, pbm2){
 .undebugForm <- function(form_name, where){
     form <- .getForm(form_name, where)
     if(missing(form))
-        stop("Form \"", form, "\" is not found in the cell of type \"", .type(where), "\"")
+        stop("Form \"", form, "\" is not found in the cell of type \"", .getType(where), "\"")
     if(is(form, "protoFormWithBrowser")){
         remove(list = form_name, envir = form@hostEnv)
         if(form@isInHost)
@@ -1672,16 +1779,16 @@ Return NULL if trigger_error = FALSE and match not found."
     if(!is.null(regexp)){
         tenv <- env
         all_names <- c()
-        while(!(identical(tenv, emptyenv()) || is.null(tenv)) && exists("type", envir = tenv)){
-            all_names <- c(all_names, ls(tenv, all = T))
+        while(!(identical(tenv, emptyenv()) || is.null(tenv)) && exists(".type", envir = tenv)){
+            all_names <- c(all_names, ls(tenv, all.names =  T))
             tenv <- parent.env(tenv)
         }
         names <- grep(regexp, unique(all_names), value = TRUE)
     }
     out <- data.frame(row.names = names)
-    while(!(identical(env, emptyenv()) || is.null(env)) && exists("type", envir = env)){
+    while(!(identical(env, emptyenv()) || is.null(env)) && exists(".type", envir = env)){
         names_in <- names %in% ls(env, all.names = TRUE)
-        type <- get("type", envir = env)
+        type <- get(".type", envir = env)
         out <- cbind(names_in, out)
         names(out)[[1]] <- type
         env <- parent.env(env)
@@ -1699,32 +1806,35 @@ Return NULL if trigger_error = FALSE and match not found."
 .get_all_names <- function(container){
     "Search recursively for names in 'container', returns all names."
     containerEnv <- as.environment(container)
+    exclude <- specialNames(container)
     all_names <- c()
     while(!identical(containerEnv, emptyenv())){
         all_names <- c(all_names, ls(containerEnv, all.names = TRUE))
         containerEnv <- parent.env(containerEnv)
     }
-    unique(all_names)
+    all_names <- unique(all_names)
+    all_names[!(all_names %in% exclude)]
 }
 
 
-.get_all_names_with_host <- function(container, host){
+.get_all_names_with_host <- function(container){
     "Search recursively for names in 'container', return a list of the form
 list(typeA = c('foo', 'bar'), typeB = ...)"
-    host <- as.environment(host)
+    host <- as.environment(container@host)
+
     if(is.character(container))
         container <- host[[container]]
+    exclude <- specialNames(container)
     containerEnv <- as.environment(container)
     all_names <- list()
     while(!identical(containerEnv, emptyenv())){
-        all_names[[host[["type"]]]] <- ls(containerEnv, all.names = TRUE)
+        these_names <- ls(containerEnv, all.names = TRUE)
+        all_names[[host[[".type"]]]] <- unique(these_names[!(these_names %in% exclude)])
         containerEnv <- parent.env(containerEnv)
         host <- as.environment(host)[[".prototype"]]
     }
     all_names
 }
-
-
 
 
 .infer_type_cell <- function(cell){
@@ -1733,33 +1843,33 @@ if not a symbol, returns NULL"
     stopifnot(is(cell, "protoCell"))
     name <- substitute(cell)
     cellEnv <- as.environment(cell)
-    if(identical(cellEnv[["type"]], "--"))
+    if(identical(cellEnv[[".type"]], "--"))
         if(is.name(name)) return(name)
         else return(NULL)
-    else return(cellEnv[["type"]])
+    else return(cellEnv[[".type"]])
 }
 
 ## *******************
 .setType <- function(object, type){
-    if(is(object, "cellInfo"))
+    if(is(object, "protoCellInfo"))
         object[["type"]] <- type
     else if (is(object, "protoCell"))
-        assign("type", type, envir = object)
+        assign(".type", type, envir = object)
     else
         stop("can not set the type for object of class \"", class(object), "\"")
     object
 }
 
-.type <- function(object, fullName = T, collapse = "."){
-    if(is(object, "cellInfo")) return(object[["type"]])
+.getType <- function(object, fullName = T, collapse = "."){
+    if(is(object, "protoCellInfo")) return(object[["type"]])
     if(is.null(object)) return("NULL")
     if(!is(object, "envProtoClass"))
-        stop("The 'object' argument must be of class 'cellInfo' or 'envProtoClass',  suplied an object of class ",  class(object))
+        stop("The 'object' argument must be of class 'protoCellInfo' or 'envProtoClass',  suplied an object of class ",  class(object))
     if(fullName){
         type_local <- function(x, type_chain){
             x <- as.environment(x)
-            if(isRoot(x)) c(type_chain, x[["type"]])
-            else Recall(x[[".prototype"]], c(type_chain, x[["type"]]))
+            if(isRoot(x)) c(type_chain, x[[".type"]])
+            else Recall(x[[".prototype"]], c(type_chain, x[[".type"]]))
         }
         type <- type_local(object, c())
         if(is.character(collapse))
@@ -1767,7 +1877,7 @@ if not a symbol, returns NULL"
         else
             type
     }else{
-        as.environment(object)[["type"]]
+        as.environment(object)[[".type"]]
     }
 }
 
@@ -1775,112 +1885,112 @@ if not a symbol, returns NULL"
 
 ###_* GRAPH
 
-leafNames <- function(cellContainer){
-    "return leaf cells names from the container"
-    cont_env <- as.environment(cellContainer)
-    allC <- unlist(eapply(cont_env, function(el)
-                          format(as.environment(el))))
-    protC <- unlist(eapply(cont_env, function(el)
-                           if(is.null(out <- get(".prototype", envir = el)))
-                           format(out)
-                           else
-                           format(as.environment(out))))
-    names(allC)[!allC %in% c(protC, "NULL")]
-}
+## leafNames <- function(cellContainer){
+##     "return leaf cells names from the container"
+##     cont_env <- as.environment(cellContainer)
+##     allC <- unlist(eapply(cont_env, function(el)
+##                           format(as.environment(el))))
+##     protC <- unlist(eapply(cont_env, function(el)
+##                            if(is.null(out <- get(".prototype", envir = el)))
+##                            format(out)
+##                            else
+##                            format(as.environment(out))))
+##     names(allC)[!allC %in% c(protC, "NULL")]
+## }
 
-.as_cellContainer_graphNEL <- function(from){
-    require(graph)
-    env_from <- as.environment(from)
-    all_names <- ls(env_from, all.names = TRUE)
-    leaf_names <- leafNames(from)
-    .gr <- new("graphNEL", nodes=all_names, edgemode = "directed")
-    ## NODES
-    nodeDataDefaults(.gr, "short_name") <- "?"
-    nodeDataDefaults(.gr, "type") <- "?" # "leaf" or "prototype"
-    nodeData(.gr, all_names, "short_name") <- sapply(all_names, function(nm) get("type", envir = env_from[[nm]]))
-    nodeData(.gr, all_names, "type") <- "prototype"
-    nodeData(.gr, leaf_names, "type") <- "leaf"
-    ## EDGES
-    edgeDataDefaults(.gr, "type") <- "?" # "model" or "prototype"
-    ## add edges: based only on leaf_names!
-    lapply(leaf_names, function(nm){
-        rec_names <- unlist(strsplit(nm, split = ".", fixed = TRUE))     ## "aa" "bb" "cc"
-        cum_names <-
-            Reduce(function(x, y) ## "aa.bb.cc" "aa.bb"    "aa"
-                   c(paste(y, x[[1]], sep = "."), x), rev(rec_names), right = FALSE)
-        suppressWarnings({
-            .gr <<- addEdge(cum_names[ -1], cum_names[-length(cum_names)], .gr)
-            edgeData(.gr, cum_names[ -1], cum_names[-length(cum_names)], "type") <<- "prototype"
-        })
-    })
-    .gr
-}
+## .as_cellContainer_graphNEL <- function(from){
+##     require(graph)
+##     env_from <- as.environment(from)
+##     all_names <- ls(env_from, all.names = TRUE)
+##     leaf_names <- leafNames(from)
+##     .gr <- new("graphNEL", nodes=all_names, edgemode = "directed")
+##     ## NODES
+##     nodeDataDefaults(.gr, "short_name") <- "?"
+##     nodeDataDefaults(.gr, "type") <- "?" # "leaf" or "prototype"
+##     nodeData(.gr, all_names, "short_name") <- sapply(all_names, function(nm) get("type", envir = env_from[[nm]]))
+##     nodeData(.gr, all_names, "type") <- "prototype"
+##     nodeData(.gr, leaf_names, "type") <- "leaf"
+##     ## EDGES
+##     edgeDataDefaults(.gr, "type") <- "?" # "model" or "prototype"
+##     ## add edges: based only on leaf_names!
+##     lapply(leaf_names, function(nm){
+##         rec_names <- unlist(strsplit(nm, split = ".", fixed = TRUE))     ## "aa" "bb" "cc"
+##         cum_names <-
+##             Reduce(function(x, y) ## "aa.bb.cc" "aa.bb"    "aa"
+##                    c(paste(y, x[[1]], sep = "."), x), rev(rec_names), right = FALSE)
+##         suppressWarnings({
+##             .gr <<- addEdge(cum_names[ -1], cum_names[-length(cum_names)], .gr)
+##             edgeData(.gr, cum_names[ -1], cum_names[-length(cum_names)], "type") <<- "prototype"
+##         })
+##     })
+##     .gr
+## }
 
 
-## gR <- as(M[[".cells"]], "graphNEL")
-## str(renderGraph(layoutGraph(gR)))
-## plot(gR)
-## edges(gR)
+## ## gR <- as(M[[".cells"]], "graphNEL")
+## ## str(renderGraph(layoutGraph(gR)))
+## ## plot(gR)
+## ## edges(gR)
 
-plotCellGraph <-
-    function(x, y, col.prototype="cyan",
-             col.leafs="yellow",
-             layoutType = c("dot","neato","twopi","circo","fdp"),
-             plot.root=F, container = ".cells",
-             fill = "Set2", #if character of length 1, it is a brewer palette name
-             shape = c("circle", "ellipse", "box"),
-             col = c("black", "darkgreen", "darkblue"),
-             cex = 1,
-             lwd = 2,
-             textCol = "black",
-             bg = "gray20",
-             ...){
-        x <- as(x, "graphNEL")
-        old_par <- par(bg="gray20")
-        if(!plot.root){
-            x <- subGraph(nodes(x)[!nodes(x)%in%"*"], x)
-        }
-        localTypeProps <- function(prop, nr, type, names)
-            setNames(rep(prop, length.out = nr)[type], names)
-        ## rearange common labels such that same type nodes and edges have same graphical properties:
-        typeNodes <- unlist(sapply(nodeData(x), function(nd) nd$type))
-        typeEdges <- unlist(sapply(edgeData(x), function(nd) nd$type))
-        common <- intersect(typeNodes, typeEdges)
-        all_labels <- unique(c(typeEdges, typeNodes))
-        all_labels <- c(common, setdiff(all_labels, common))
-        typeNodes <- factor(typeNodes, levels = all_labels)
-        typeEdges <- factor(typeEdges, levels = all_labels)
-        ## NODES
-        type <- typeNodes
-        labels <- sapply(nodeData(x), function(nd) nd$short_name)
-        nodeNames <- names(type)
-        if(is.character(fill) && length(fill) == 1L){
-            library(RColorBrewer)
-            fill <- brewer.pal(max(length(levels(type)), 3L), fill)
-        }
-        nrt <- length(levels(type))
-        nodeRenderInfo(x) <-
-            list(lwd = localTypeProps(lwd, nrt, type, nodeNames),
-                 cex = localTypeProps(cex, nrt, type, nodeNames),
-                 textCol = localTypeProps(textCol, nrt, type, nodeNames),
-                 col = localTypeProps(col, nrt, type, nodeNames),
-                 fill = localTypeProps(fill, nrt, type, nodeNames),
-                 shape = localTypeProps(shape, nrt, type, nodeNames),
-                 label = labels)
-        ## EDGES
-        type <- typeEdges
-        edgeNames <- names(type)
-        names(type) <- edgeNames <- gsub("\\|", "~", edgeNames)
-        ## if(is.character(fill) && length(fill) == 1L)
-        ##     fill <- brewer(max(length(levels(type)), 3L), fill)
-        edgeRenderInfo(x) <-
-            list(col = localTypeProps(fill, nrt, type, edgeNames))
-        ## LAYOUT
-        layoutType <- layoutType[[1]]
-        x <- layoutGraph(x, layoutType=layoutType)
-        renderGraph(x)
-        par(old_par)
-    }
+## plotCellGraph <-
+##     function(x, y, col.prototype="cyan",
+##              col.leafs="yellow",
+##              layoutType = c("dot","neato","twopi","circo","fdp"),
+##              plot.root=F, container = ".cells",
+##              fill = "Set2", #if character of length 1, it is a brewer palette name
+##              shape = c("circle", "ellipse", "box"),
+##              col = c("black", "darkgreen", "darkblue"),
+##              cex = 1,
+##              lwd = 2,
+##              textCol = "black",
+##              bg = "gray20",
+##              ...){
+##         x <- as(x, "graphNEL")
+##         old_par <- par(bg="gray20")
+##         if(!plot.root){
+##             x <- subGraph(nodes(x)[!nodes(x)%in%"*"], x)
+##         }
+##         localTypeProps <- function(prop, nr, type, names)
+##             setNames(rep(prop, length.out = nr)[type], names)
+##         ## rearange common labels such that same type nodes and edges have same graphical properties:
+##         typeNodes <- unlist(sapply(nodeData(x), function(nd) nd$type))
+##         typeEdges <- unlist(sapply(edgeData(x), function(nd) nd$type))
+##         common <- intersect(typeNodes, typeEdges)
+##         all_labels <- unique(c(typeEdges, typeNodes))
+##         all_labels <- c(common, setdiff(all_labels, common))
+##         typeNodes <- factor(typeNodes, levels = all_labels)
+##         typeEdges <- factor(typeEdges, levels = all_labels)
+##         ## NODES
+##         type <- typeNodes
+##         labels <- sapply(nodeData(x), function(nd) nd$short_name)
+##         nodeNames <- names(type)
+##         if(is.character(fill) && length(fill) == 1L){
+##             library(RColorBrewer)
+##             fill <- brewer.pal(max(length(levels(type)), 3L), fill)
+##         }
+##         nrt <- length(levels(type))
+##         nodeRenderInfo(x) <-
+##             list(lwd = localTypeProps(lwd, nrt, type, nodeNames),
+##                  cex = localTypeProps(cex, nrt, type, nodeNames),
+##                  textCol = localTypeProps(textCol, nrt, type, nodeNames),
+##                  col = localTypeProps(col, nrt, type, nodeNames),
+##                  fill = localTypeProps(fill, nrt, type, nodeNames),
+##                  shape = localTypeProps(shape, nrt, type, nodeNames),
+##                  label = labels)
+##         ## EDGES
+##         type <- typeEdges
+##         edgeNames <- names(type)
+##         names(type) <- edgeNames <- gsub("\\|", "~", edgeNames)
+##         ## if(is.character(fill) && length(fill) == 1L)
+##         ##     fill <- brewer(max(length(levels(type)), 3L), fill)
+##         edgeRenderInfo(x) <-
+##             list(col = localTypeProps(fill, nrt, type, edgeNames))
+##         ## LAYOUT
+##         layoutType <- layoutType[[1]]
+##         x <- layoutGraph(x, layoutType=layoutType)
+##         renderGraph(x)
+##         par(old_par)
+##     }
 
 
 ###_* INFO
@@ -1898,7 +2008,7 @@ plotCellGraph <-
     out <- data.frame(row.names = names)
     while(!(identical(containerEnv, emptyenv()) || is.null(pObject))){
         names_in <- names %in% ls(containerEnv, all.names = TRUE)
-        type <- get("type", envir = pObject)
+        type <- get(".type", envir = pObject)
         out <- cbind(names_in, out)
         names(out)[[1]] <- type
         containerEnv <- parent.env(containerEnv)
@@ -1918,8 +2028,8 @@ plotCellGraph <-
     if(!is(object, "envProtoClass")) stop("Not a valid object from class envProtoClass")
     info_local <- function(x, info_chain){
         x <- as.environment(x)
-        info <- c(cellType = x[["type"]],
-                  homeCxtType = .type(x[[".self"]][[".homeContext"]]),
+        info <- c(cellType = x[[".type"]],
+                  homeCxtType = .getType(x[[".self"]][[".homeContext"]]),
                   class = class(x[[".self"]]),
                   homeCxtClass = class(x[[".self"]][[".homeContext"]]))
         if(isRoot(x)) rbind(info, info_chain)
@@ -1936,7 +2046,7 @@ plotCellGraph <-
     if(!is(object, "protoContext")) stop("Not a valid object from class protoContext")
     info_local <- function(x, info_chain){
         x <- as.environment(x)
-        info <- c(contextType = x[["type"]],
+        info <- c(contextType = x[[".type"]],
                   class = class(x[[".self"]]))
         if(isRoot(x)) rbind(info, info_chain)
         else Recall(x[[".prototype"]], rbind(info, info_chain))
@@ -1959,13 +2069,13 @@ plotCellGraph <-
             .get_all_names(get(".forms", envir = pObject))
         }else if(is.null(names)){
             names <- .get_all_names(get(".forms", envir = pObject))
-            names[names %in% ls(pObject, all = TRUE)]
+            names[names %in% ls(pObject, all.names =  TRUE)]
         }
     res <- replicate(length(names),
                      data.frame(check.names = FALSE), simplify = FALSE)
     names(res) <- names
     while(!is.null(pObject)){
-        type <- get("type", envir = pObject)
+        type <- get(".type", envir = pObject)
         proto <- get(".prototype", envir = pObject)
         for(nm in names){
                                         #            eval(substitute(
@@ -2067,95 +2177,111 @@ print.infoForms <- function(x, ...){
 ## close(template)
 ## browseURL(File)
 
-browseInfo <-
-    function (x, File, title = "Info Browser", header1 = "", header2 = "",
-              openBrowser = TRUE, stylesheet = "info.dark", ...)
-{
-    ## x should be a df.
-    library(brew)
-    library(highlight)
-    if (nrow(x) < 1) {
-        cat("x has zero rows;  nothing to display.\n")
-        if (missing(where))
-            where <- ""
-        return(invisible(where))
-    }
-    if (missing(File))
-        f0 <- tempfile()
-    for (i in 1:111) {
-        File <- paste(f0, ".html", sep = "")
-        fInf <- file.info(File)
-        if (all(is.na(fInf)))
-            break
-        f0 <- paste(f0, "1", sep = "")
-    }
-    Dir <- dirname(File)
-    if (Dir == ".") {
-        Dir <- getwd()
-        File <- file.path(Dir, File)
-    }else{
-        dc0 <- dir.create(Dir, FALSE, TRUE)
-    }
-    js <- file_path_as_absolute("~/works/R_dev/pbm/info.js")
-    css <-
-        switch(stylesheet,
-               info.dark = file_path_as_absolute("~/works/R_dev/pbm/info.dark.css"),
-               file_path_as_absolute("~/works/R_dev/pbm/info.css")
-               )
-    if (!file.exists(js)) {
-        stop("Unable to locate '", js, "' file")
-    }else if(!file.exists(css)){
-        stop("Unable to locate '", css, "' file")
-    }else {
-        file.copy(js, Dir, overwrite = TRUE)
-        file.copy(css, Dir, overwrite = TRUE)
-    }
-    templateFile <- "~/works/R_dev/pbm/template.html"
-    if (!file.exists(templateFile))
-        stop("Unable to locate '~/works/R_dev/pbm/template.html' file")
-    template <- file(templateFile, encoding = "utf-8", open = "r")
-    xenv <- new.env()
-    assign("header1", header1, envir = xenv)
-    assign("header2", header2, envir = xenv)
-    assign("x", x, envir = xenv)
-    assign("title", title, envir = xenv)
-    assign("stylesheet", basename(css))
-    brew(template, File, envir = xenv)
-    close(template)
-    FileInfo <- file.info(File)
-    if (is.na(FileInfo$size) || FileInfo$size <= 0) {
-        if (is.na(FileInfo$size)) {
-            stop("Brew did not create file ", File)
-        }
-        else {
-            stop("Brew created a file of size 0")
-        }
-    }else if (openBrowser) {
-        if (is.na(FileInfo$size)) {
-            warning("Did not create file ", File, ";  nothing to give to a browser.")
-        }
-        else {
-            if (FileInfo$size <= 0) {
-                warning("0 bytes in file ", File, ";  nothing to give to a browser.")
-            }
-            else {
-                browseURL(File)
-            }
-        }
-    }
-    invisible(File)
-}
+## browseInfo <-
+##     function (x, File, title = "Info Browser", header1 = "", header2 = "",
+##               openBrowser = TRUE, stylesheet = "info.dark", ...)
+## {
+##     ## x should be a df.
+##     library(brew)
+##     library(highlight)
+##     if (nrow(x) < 1) {
+##         cat("x has zero rows;  nothing to display.\n")
+##         if (missing(where))
+##             where <- ""
+##         return(invisible(where))
+##     }
+##     if (missing(File))
+##         f0 <- tempfile()
+##     for (i in 1:111) {
+##         File <- paste(f0, ".html", sep = "")
+##         fInf <- file.info(File)
+##         if (all(is.na(fInf)))
+##             break
+##         f0 <- paste(f0, "1", sep = "")
+##     }
+##     Dir <- dirname(File)
+##     if (Dir == ".") {
+##         Dir <- getwd()
+##         File <- file.path(Dir, File)
+##     }else{
+##         dc0 <- dir.create(Dir, FALSE, TRUE)
+##     }
+##     js <- file_path_as_absolute("~/works/R_dev/pbm/info.js")
+##     css <-
+##         switch(stylesheet,
+##                info.dark = file_path_as_absolute("~/works/R_dev/pbm/info.dark.css"),
+##                file_path_as_absolute("~/works/R_dev/pbm/info.css")
+##                )
+##     if (!file.exists(js)) {
+##         stop("Unable to locate '", js, "' file")
+##     }else if(!file.exists(css)){
+##         stop("Unable to locate '", css, "' file")
+##     }else {
+##         file.copy(js, Dir, overwrite = TRUE)
+##         file.copy(css, Dir, overwrite = TRUE)
+##     }
+##     templateFile <- "~/works/R_dev/pbm/template.html"
+##     if (!file.exists(templateFile))
+##         stop("Unable to locate '~/works/R_dev/pbm/template.html' file")
+##     template <- file(templateFile, encoding = "utf-8", open = "r")
+##     xenv <- new.env()
+##     assign("header1", header1, envir = xenv)
+##     assign("header2", header2, envir = xenv)
+##     assign("x", x, envir = xenv)
+##     assign("title", title, envir = xenv)
+##     assign("stylesheet", basename(css))
+##     brew(template, File, envir = xenv)
+##     close(template)
+##     FileInfo <- file.info(File)
+##     if (is.na(FileInfo$size) || FileInfo$size <= 0) {
+##         if (is.na(FileInfo$size)) {
+##             stop("Brew did not create file ", File)
+##         }
+##         else {
+##             stop("Brew created a file of size 0")
+##         }
+##     }else if (openBrowser) {
+##         if (is.na(FileInfo$size)) {
+##             warning("Did not create file ", File, ";  nothing to give to a browser.")
+##         }
+##         else {
+##             if (FileInfo$size <= 0) {
+##                 warning("0 bytes in file ", File, ";  nothing to give to a browser.")
+##             }
+##             else {
+##                 browseURL(File)
+##             }
+##         }
+##     }
+##     invisible(File)
+## }
 
-browseForms <-
-    function(pObject, names = NULL, regexp = NULL, all.names = FALSE, stylesheet = "info.dark", ...) {
-        x <- as.data.frame(.infoForms(pObject = pObject, names = names, regexp = regexp,
-                                      all.names = all.names))
-        title <- gettextf("Form info for %s of type \" %s\"",
-                          class(pObject), .type(pObject))
-        header1 <- title
-        header2 <- paste("Info for the following names: \n",
-                         paste(names, collapse = ", "))
-        browseInfo(x, title = title, header1 = header1, header2 = header2, stylesheet = stylesheet, ...)
-    }
+## browseForms <-
+##     function(pObject, names = NULL, regexp = NULL, all.names = FALSE, stylesheet = "info.dark", ...) {
+##         x <- as.data.frame(.infoForms(pObject = pObject, names = names, regexp = regexp,
+##                                       all.names = all.names))
+##         title <- gettextf("Form info for %s of type \" %s\"",
+##                           class(pObject), .getType(pObject))
+##         header1 <- title
+##         header2 <- paste("Info for the following names: \n",
+##                          paste(names, collapse = ", "))
+##         browseInfo(x, title = title, header1 = header1, header2 = header2, stylesheet = source, ...)
+##     }
 
-source("../R/classes.R")
+source("~/works/protoClasses/R/classes.R")
+
+## Local Variables:
+## ess-roxy-template-alist: (
+##  ("description" . "..description")
+##  ("details" . "..details")
+##  ("title" . "")
+##  ;;("rdname" . "")
+##  ("param" . "")
+##  ;;("return" . "Object of class \\code{xxx} containing slot ")
+##  ("author" . "Vitalie Spinu (\\email{spinuvit@@gmail.com})")
+##  ("export" . "")
+##  ("seealso" . "\\code{\\link{protoClasses-package}} \\code{\\link{protoContext}}")
+##  ;;("references" . "\\url{https://docs.developer.betfair.com/betfair/}")
+##  )
+## end:
+

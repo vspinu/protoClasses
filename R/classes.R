@@ -7,7 +7,7 @@ if(existsMethod("initialize", "protoCell"))
 
 ###_ GENERIC METHODS:
 setGeneric("installBinding",
-           def = function(bindInfo, where, bindName, container = ".cells", ...) standardGeneric("installBinding"),
+           def = function(bindInfo, container, bindName, ...) standardGeneric("installBinding"),
            useAsDefault = .installBinding_default)
 setGeneric("initializeRoot", function(.Object, ...) standardGeneric("initializeRoot"))
 setGeneric("clone",
@@ -18,21 +18,18 @@ setGeneric("clone",
 ###_ FUNDAMENTAL OBJECTS:
 
 ###__ INFO:
-## todo: change to protoCellInfo,protoFormInfo etc
-## for other Infos default binding is ok? :todo
-
-###___ cellInfo
-setClass("cellInfo",
+###___ protoCellInfo
+setClass("protoCellInfo",
          representation(cellClass = "character",
                         names = "character"),
          prototype(cellClass = "protoCell"),
          contains = "list")
 
-setMethod("installBinding", "cellInfo",
-          .installBinding_cellInfo)
+setMethod("installBinding", "protoCellInfo",
+          .installBinding_protoCellInfo)
 
-###___ formInfo
-setClass("formInfo",
+###___ protoFormInfo
+setClass("protoFormInfo",
          representation(formClass = "character"),
          prototype(formClass = "protoForm")) # add host protoObject?
 
@@ -69,6 +66,14 @@ setMethod("installBinding", "protoField",
           .installBinding_protoField)
 
 ###___ protoForm
+##' Class to represent protoForms.
+##'
+##' protoForms are expressions which can contain protoForms as
+##' subexpressions. Slots are:
+##' @export
+## @slot names character vector providing names for each subexpression or
+## subform.
+## @slot doc Self contained documentation.
 setClass("protoForm",
          representation(names = "character",
                         doc = "character"),
@@ -97,6 +102,11 @@ setMethod("initialize", "protoForm",
               names(.Object) <- .makeNames(allNames(.Object))
               .Object
           })
+
+##' Subset protoForm objects.
+##'
+##' @param x protoForm object
+##' Return a protoForm object.
 setMethod("[",
           signature(x = "protoForm"),
           function (x, i, j, ..., drop = TRUE){
@@ -124,6 +134,11 @@ setClass("protoFormWithBrowser",
 
 ###_ PROTO:
 ###__ envProtoClass
+
+##' Parent S4 class of all proto objects.
+##'
+##' \link{protoContext-class} and \link{protoCell-class}
+##' @export
 setClass("envProtoClass", contains = "environment")
 setMethod("initializeRoot", "envProtoClass",
           .initializeRoot_envProtoClass)
@@ -136,17 +151,39 @@ setMethod("show", signature(object = "envProtoClass"),
           .show_EnvProtoObject)
 setMethod("clone", "envProtoClass",
           .clone_envProtoClass)
+
+##' Dollar accessors of envProtoClasses
+##'
+##' "$" syntax is a multifunctional accessor for \code{envProtoClasses}
+##' todo:....
+##' @rdname dollar
+##' @param x an object extending envProtoClass
+##' 
 setMethod("$",
           signature(x = "envProtoClass"),
           definition = .dollarGet_envProtoClass
           )
+
+##'
+##' @rdname dollar
 setMethod("$<-",
           signature(x = "envProtoClass"),
           definition = .dollarSet_envProtoClass
           )
 
 ###__ protoContext
+##' Class to represent proto contexts
+##' @export
 setClass("protoContext", contains = "envProtoClass")
+
+##' Constructor for protoContext objects
+##'
+##' @inheritParams protoCell
+##' @param cells ...
+##' @param initCells ...
+##' @param rootParentEnv ...
+##' @return an object of class protoContext
+##' @author Vitalie Spinu
 protoContext <- function(
                   type = "--",
                   prototype = NULL,
@@ -175,25 +212,54 @@ setMethod("show", signature(object = "protoContext"),
           .show_Context)
 setMethod("clone", "protoContext",
           .clone_protoContext)
+
+##' @rdname dollar
 setMethod("$",
           signature(x = "protoContext"),
           definition = .dollarGet_protoContext
           )
+
+##' @rdname dollar
 setMethod("$<-",
           signature(x = "protoContext"),
           definition = .dollarSet_protoContext
           )
 
 
-
 ###__ protoCell
+##' Class to represent cells.
+##'
+##' See \link{protoCell} constructor for more details.
+##' @export
 setClass("protoCell", contains = "envProtoClass")
 setMethod("initializeRoot", "protoCell",
           .initializeRoot_protoCell)
 
+
+##' Default constructor of proto cells.
+##'
+##' Proto Cells recide inside protoContext in special container
+##' \code{.cells}. Proto Cells also derive from \link{envProtoClass} and exhibit
+##' normal prototype behavior, in the sence that each cell inherit it's methods,
+##' fields and forms form parent cells.
+##'
+##' @param type type
+##' @param prototype parent cell
+##' @param fields ...
+##' @param methods ...
+##' @param forms ...
+##' @param initFields ...
+##' @param initMethods ...
+##' @param initForms ...
+##' @param expr ...
+##' @param rootParentEnv ...
+##' @param ... ...
+##' @return object of class \link{protoCell-class}.
+##' @author Vitalie Spinu
+##' @export
 protoCell <- function(
                type = "--",
-               prototype = NULL,
+               prototype = "*",
                fields = list(),
                methods = list(),
                forms = list(),
@@ -212,31 +278,78 @@ protoCell <- function(
 setMethod("installBinding", "protoCell",
           .installBinding_protoCell)
 
-
 ###__ protoContainer
 setClass("protoContainer",
-         representation = list(typeContainer = "character"),
+         representation = list(typeContainer = "character", host = "envProtoClass"),
          contains = "environment")
 setMethod("initialize", signature(.Object = "protoContainer"),
-          function(.Object, parentContainer = NULL, ...){
-              ## tothink: .self is necessary?
-              if(is.null(parentContainer)) parentContainer <- emptyenv()
+          function(.Object, ...){
               .Object <- callNextMethod()
-              .Object@.xData <- new.env(TRUE, as.environment(parentContainer))
+              parentContainer <- 
+                  if(is.null(prot <- .getPrototype(.Object@host))){
+                      emptyenv()
+                  }else{
+                      prot[[.Object@typeContainer]]
+                  }
+              env <- new.env(TRUE, as.environment(parentContainer))
+              .Object@.xData <- env
               .Object
           })
+setMethod("$",
+          signature(x = "protoContainer"),
+          definition = function(x, name) get(name, envir = x))
+
 setMethod("clone", "protoContainer",
           .clone_protoContainer)
+setMethod("show", signature(object = "protoContainer"),
+          .show_Container)
+
+setGeneric("specialNames", def = function(protoObject) standardGeneric("specialNames"),
+           useAsDefault = function(protoObject) character())
+
+###__ formContainer
+setClass("formContainer",
+         prototype = prototype(typeContainer = ".forms"),
+         contains = "protoContainer")
+setMethod("$", signature(x = "formContainer"),
+          .dollarGet_formContainer)
+setMethod("$<-", signature(x = "formContainer"),
+          function(x, name) .dollarSet_formContainer(x, name, value))
+
+###__ methodContainer
+setClass("methodContainer",
+         prototype = prototype(typeContainer = ".methods"),
+         contains = "protoContainer")
+setMethod("$",
+          signature(x = "methodContainer"),
+          .dollarGet_methodContainer )
+setMethod("$<-", signature(x = "methodContainer"),
+          function(x, name, value) .dollarSet_methodContainer(x, name, value))
+setMethod("specialNames", "methodContainer",
+          function(protoObject) c("cells", "expr", "fields", "forms", "initCells", "initFields", 
+                                  "initForms", "initMethods", "methods", "setFields", "setForms", 
+                                  "setMethods"))
+
+###__ fieldContainer
+setClass("fieldContainer",
+         prototype = prototype(typeContainer = ".fields"),
+         contains = "protoContainer")
+setMethod("$", signature(x = "fieldContainer"),
+          .dollarGet_fieldContainer)
+setMethod("$<-", signature(x = "fieldContainer"),
+          function(x, name, value) .dollarSet_fieldContainer(x, name, value))
+setMethod("specialNames", "fieldContainer",
+          function(protoObject) c("f", "h", "m", "type", "Type"))
+          
 
 ###__ cellContainer
 setClass("cellContainer",
          prototype = prototype(typeContainer = ".cells"),
          contains = "protoContainer")
-setMethod("show", signature(object = "protoContainer"),
-          .show_Container)
 setMethod("clone", "cellContainer",
           .clone_cellContainer)
-
+setMethod("$", signature(x = "cellContainer"),
+          .dollarGet_cellContainer)
 
 ###_ CLASS REPRESENTATIONS:
 ## Extension of classRepresentation to store two new slots: defaultContext and
@@ -300,11 +413,6 @@ setMethod("setPrototype", "protoContext",
               parent.env(get(".cells", envir = protoObj)) <- parent.env(get(".cells", envir = prototype))
           })
 
-
-.getPrototype <- function(cell)
-    as.environment(cell)[[".prototype"]]
-.setHomeContext <- function(cell, context)
-    as.environment(cell)[[".homeContext"]] <- context
 
 ## Rgraphvis functionality
 ## setAs("cellContainer", "graphNEL", .as_cellContainer_graphNEL)
