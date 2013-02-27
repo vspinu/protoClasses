@@ -23,7 +23,7 @@ setClass("protoCellInfo",
          representation(cellClass = "character",
                         names = "character"),
          prototype(cellClass = "protoCell"),
-         contains = "list")
+         contains = "namedList")
 
 setMethod("installBinding", "protoCellInfo",
           .installBinding_protoCellInfo)
@@ -423,3 +423,5 @@ setMethod("setPrototype", "protoContext",
 ##           def= plotCellGraph )
 ## setMethod("plot", c("protoContainer", "ANY"),
 ##           def = plotCellGraph)
+
+
