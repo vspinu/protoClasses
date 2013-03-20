@@ -7,7 +7,7 @@ if(existsMethod("initialize", "protoCell"))
 
 ###_ GENERIC METHODS:
 setGeneric("installBinding",
-           def = function(bindInfo, container, bindName, ...) standardGeneric("installBinding"),
+           def = function(bindDefinition, container, bindName, ...) standardGeneric("installBinding"),
            useAsDefault = .installBinding_default)
 setGeneric("initializeRoot", function(.Object, ...) standardGeneric("initializeRoot"))
 setGeneric("clone",
@@ -18,18 +18,18 @@ setGeneric("clone",
 ###_ FUNDAMENTAL OBJECTS:
 
 ###__ INFO:
-###___ protoCellInfo
-setClass("protoCellInfo",
+###___ protoCellDefinition
+setClass("protoCellDefinition",
          representation(cellClass = "character",
                         names = "character"),
          prototype(cellClass = "protoCell"),
          contains = "namedList")
 
-setMethod("installBinding", "protoCellInfo",
-          .installBinding_protoCellInfo)
+setMethod("installBinding", "protoCellDefinition",
+          .installBinding_protoCellDefinition)
 
-###___ protoFormInfo
-setClass("protoFormInfo",
+###___ protoFormDefinition
+setClass("protoFormDefinition",
          representation(formClass = "character"),
          prototype(formClass = "protoForm")) # add host protoObject?
 
@@ -117,7 +117,7 @@ setMethod("[",
 
 ###___ protoFormWithEnv
 setClass("protoFormWithEnv",
-         representation(environment = "environment"),
+         representation(environment = "environment", form_name = "character"),
          contains = "protoForm") ## used for printing, $ methods returns this object with environment slot set to .self
 setMethod("show", signature(object = "protoFormWithEnv"),
           .show_ProtoFormWithEnv)

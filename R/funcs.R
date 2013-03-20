@@ -618,7 +618,7 @@ isValidProtoObject <- function(object, trigger_error = FALSE, object_name = "Obj
 
 ## removeMethod("initialize", "protoECall")
 isECall <- function(obj){
-    if(is.recursive(obj))
+    if(is.recursive(obj) && (typeof(obj) != "special"))
         identical(obj[[1L]], as.name("e"))
     else
         FALSE
@@ -681,30 +681,30 @@ assign form with formName otherwise.
     }
     if(do_assign){
         assign(formName, newForm, envir = where)
-        .installBinding_default(new("protoFormInfo", formClass = class(newForm)),
+        .installBinding_default(new("protoFormDefinition", formClass = class(newForm)),
                                 container = where[[".forms"]], formName)
     }
     do_assign
 }
 
-.installBinding_protoForm <- function(bindInfo, container, bindName,
+.installBinding_protoForm <- function(bindDefinition, container, bindName,
                                       after = NULL, returnBinding = bindName,
                                       reinstal = FALSE){
     ## * Used recursively:
-    ## if bindInfo is a form - assign in the whereEnv and return e(...)
-    ## if bindInfo is an expression - just return (as it is called recursively)
+    ## if bindDefinition is a form - assign in the whereEnv and return e(...)
+    ## if bindDefinition is an expression - just return (as it is called recursively)
     ## * main idea: an assigned form should have only calls like e(aa.bb.cc) or
     ## simple expressions. No forms as children.
     ## * If the form's name is like aa.bb.cc ,check for existence of aa.bb and aa
     ## and install the eform e(aa.bb.cc) into aa.bb with the name "cc" and
     ## e(aa.bb) into "aa" with the name "bb".
-    ## * If bindInfo == NULL then this form ("aa.bb") and all the children forms
+    ## * If bindDefinition == NULL then this form ("aa.bb") and all the children forms
     ## ("aa.bb.cc.dd" etc) are removed from CONTAINER
     ## * if AFTER is nonnull it must be character or an integer specifying
     ## the position of the new form "cc" in the parent form "aa.bb"
 
     whereEnv <- as.environment(container@host)
-    form <- bindInfo
+    form <- bindDefinition
 
     ## bindName is aa.bb.cc
     rec_names <- unlist(strsplit(bindName, split = ".",  ## "aa" "bb" "cc"
@@ -752,12 +752,12 @@ assign form with formName otherwise.
         #     oldForm <- get(bindName, envir = whereEnv)                 #
         # if(!identical(newForm, oldForm)){                              #
         # -------------------------------------------------------------- #
-        ## todo: get the followining into unit test
+        ## todo: get the followining into unit test somehow
         if(exists(bindName, whereEnv) && 
            (ln <- length(setdiff(names(get(bindName, whereEnv)), names(newForm)))))
             warn.pbm("warning: ", ln, " subforms removed in '", bindName, "' form", env = whereEnv)
         assign(bindName, newForm, envir = whereEnv)
-        .installBinding_default(new("protoFormInfo", formClass = class(form)),
+        .installBinding_default(new("protoFormDefinition", formClass = class(form)),
                                 container, bindName, ".forms")
         return(.makeEexpr(returnBinding))
     }else{
@@ -896,7 +896,8 @@ assign form with formName otherwise.
 .getForm <- function(name, selfEnv)
     if(exists(name, envir = selfEnv[[".forms"]])){
         ## .dollarGet_formContainer(selfEnv[[".forms"]], name)
-        new("protoFormWithEnv", get(name, envir = selfEnv), environment = selfEnv)
+        new("protoFormWithEnv", get(name, envir = selfEnv),
+            environment = selfEnv, form_name = name)
     }else{
         substitute()
     }
@@ -1246,9 +1247,9 @@ If name is aa.bb, all the registered forms starting with aa.bb will
         if(!all(sapply(cells, function(el)
                        is.null(el) ||
                        is(el, "protoCell") ||
-                       is(el, "protoCellInfo") ||
+                       is(el, "protoCellDefinition") ||
                        is(el, "character")))) ## must be one of existing cells! don't create a new cell!!
-            stop("Argument for initCells must be of class  \"protoCell\" , \"protoCellInfo\" or \"character\" vector of existing types")
+            stop("Argument for initCells must be of class  \"protoCell\" , \"protoCellDefinition\" or \"character\" vector of existing types")
     }
     else
         stop(gettextf("cells arguement must must be a list got an object of class \"%s\"",
@@ -1337,16 +1338,16 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     })
 }
 
-cellFromInfo <- function(protoCellInfo, homeContext){
-    stopifnot(is(protoCellInfo, "protoCellInfo"))
+cellFromDefinition <- function(protoCellDefinition, homeContext){
+    stopifnot(is(protoCellDefinition, "protoCellDefinition"))
     ## infer name! SIDE EFFECT (does not work here,  this func is called usually  internally)
-    ## nameCell <- substitute(protoCellInfo)
-    ## if(is.name(nameCell) && identical(protoCellInfo[["type"]], "--"))
-    ##     protoCellInfo[["type"]] <- as.character(nameCell)
-    if(is(protoCellInfo$prototype, "protoCellInfo"))
-        protoCellInfo[["prototype"]] <- cellFromInfo(protoCellInfo$prototype, homeContext)
-    protoCellInfo[["homeContext"]] <- homeContext
-    do.call("new", c(list(Class = protoCellInfo@cellClass), protoCellInfo))
+    ## nameCell <- substitute(protoCellDefinition)
+    ## if(is.name(nameCell) && identical(protoCellDefinition[["type"]], "--"))
+    ##     protoCellDefinition[["type"]] <- as.character(nameCell)
+    if(is(protoCellDefinition$prototype, "protoCellDefinition"))
+        protoCellDefinition[["prototype"]] <- cellFromDefinition(protoCellDefinition$prototype, homeContext)
+    protoCellDefinition[["homeContext"]] <- homeContext
+    do.call("new", c(list(Class = protoCellDefinition@cellClass), protoCellDefinition))
 }
 
 homeContext <- function(cell)
@@ -1355,37 +1356,37 @@ homeContext <- function(cell)
 C <- function(...){
     args <- list(...)
     args[["Class"]] <- NULL
-    new("protoCellInfo", args, cellClass = "protoCell")
+    new("protoCellDefinition", args, cellClass = "protoCell")
 }
 
-.installBinding_default <- function(bindInfo, container, bindName, ...){
+.installBinding_default <- function(bindDefinition, container, bindName, ...){
     ## default methods just assigns the stuff in the container.
-    assign(bindName, bindInfo, envir = container)
+    assign(bindName, bindDefinition, envir = container)
 }
 
-.installBinding_protoCell <- function(bindInfo, container, bindName, ...){
+.installBinding_protoCell <- function(bindDefinition, container, bindName, ...){
     ## bindName has precedence:
     if(!missing(bindName) && !identical(bindName, ""))
-        assign("type", bindName, envir = bindInfo)
+        assign("type", bindName, envir = bindDefinition)
     else
-        bindName <- get("type", envir = bindInfo)
-    .installCellInContainer(bindInfo, container = container)
+        bindName <- get("type", envir = bindDefinition)
+    .installCellInContainer(bindDefinition, container = container)
 }
 
-.installBinding_protoCellInfo <- function(bindInfo, container, bindName, ...){
+.installBinding_protoCellDefinition <- function(bindDefinition, container, bindName, ...){
     if(!missing(bindName) && !identical(bindName, ""))
-        bindInfo[["type"]] <- bindName
-    new_cell <- cellFromInfo(bindInfo, homeContext = container@host)
+        bindDefinition[["type"]] <- bindName
+    new_cell <- cellFromDefinition(bindDefinition, homeContext = container@host)
     installBinding(new_cell, container, bindName) ## fixme: bindName is not needed here?
     invisible(new_cell)
 }
 
-.installBinding_protoField <- function(bindInfo, container, bindName, ...){
+.installBinding_protoField <- function(bindDefinition, container, bindName, ...){
     ## assign if different
     ## containerEnv <- get(container, envir = where)
     ## if(exists(bindName, envir = containerEnv)){
     ##     oldField <- get(bindName, envir = containerEnv)
-    ##     ## if(!identical(bindInfo, oldField))
+    ##     ## if(!identical(bindDefinition, oldField))
     ##     ##     callNextMethod()
     ##     ## ## else do nothing
     ## }else{
@@ -1637,50 +1638,98 @@ areIdenticalPBM <- function(pbm1, pbm2){
     methods:::.printNames("Contains: ", .get_all_names(object))
 }
 
-.print_ProtoFormWithEnv <- function(x, code = TRUE, ...){
-    ## assumes that "name" exists and checks are not made.
-    .print_local <- function(name, where, lev, code){
-        if(exists(name, envir = where)){
-            form <- get(name, envir = where)
-            if(is(form, "protoForm")){
-                cat(rep(".. ", lev),"e(", name, ")\n", sep = "")
-                if(length(form@doc)) {
-                    cat("## DOC: \n")
-                    print(form@doc)
+## .print_ProtoFormWithEnv <- function(x, code = TRUE, ...){
+##     ## assumes that "name" exists and checks are not made.
+##     .print_local <- function(name, where, lev, code){
+##         if(exists(name, envir = where)){
+##             form <- get(name, envir = where)
+##             if(is(form, "protoForm")){
+##                 cat(rep(".. ", lev),"e(", name, ")\n", sep = "")
+##                 if(length(form@doc)) {
+##                     cat("## DOC: \n")
+##                     print(form@doc)
 
-                }
-                for(i in seq_along(form)){
-                    fm <- form[[i]]
-                    if(isECall(fm)){
-                        Recall(as.character(fm[[2]]), where, lev = lev + 1L, code)
-                    }else{
-                        if(code){
-                            te <- as.expression(fm)[[1]]
-                            attr(te, "wholeSrcref") <- NULL ## kludge
-                            attr(te, "srcfile") <- NULL ## kludge
-                            cat(paste(paste(rep.int("   ", lev), collapse = ""),
-                                      capture.output(print(te))),  sep ="\n")
-                        }}
-                }
-            }else{
-                cat(rep(".. ", lev),"e(", name, ") <-- missing\n", sep = "")
-            }
-        }}
-    ## cat("##", name, "\n", sep = "")
-    f_names <- names(x)
-    for(i in seq_along(x)){
-        fm <- x[[i]]
-        if(isECall(fm)){
-            .print_local(as.character(fm[[2]]), x@environment, lev = 0L, code)
-        }else{
-            cat(f_names[[i]], "\n")
-            te <- as.expression(fm)[[1]]
-            attr(te, "wholeSrcref") <- NULL ## kludge
-            attr(te, "srcfile") <- NULL ## kludge
-            print(te)
-        }
+##                 }
+##                 for(i in seq_along(form)){
+##                     fm <- form[[i]]
+##                     if(isECall(fm)){
+##                         Recall(as.character(fm[[2]]), where, lev = lev + 1L, code)
+##                     }else{
+##                         if(code){
+##                             te <- as.expression(fm)[[1]]
+##                             attr(te, "wholeSrcref") <- NULL ## kludge
+##                             attr(te, "srcfile") <- NULL ## kludge
+##                             cat(paste(paste(rep.int("   ", lev), collapse = ""),
+##                                       capture.output(print(te))),  sep ="\n")
+##                         }}
+##                 }
+##             }else{
+##                 cat(rep(".. ", lev),"e(", name, ") <-- missing\n", sep = "")
+##             }
+##         }}
+##     ## cat("##", name, "\n", sep = "")
+##     f_names <- names(x)
+##     for(i in seq_along(x)){
+##         fm <- x[[i]]
+##         if(isECall(fm)){
+##             .print_local(as.character(fm[[2]]), x@environment, lev = 0L, code)
+##         }else{
+##             cat(f_names[[i]], "\n")
+##             te <- as.expression(fm)[[1]]
+##             attr(te, "wholeSrcref") <- NULL ## kludge
+##             attr(te, "srcfile") <- NULL ## kludge
+##             print(te)
+##         }
+##     }
+## }
+
+.print_ProtoFormWithEnv <- function(x, code = TRUE, ...){
+    .sub <- function(te){
+        for( i in seq_along(te)){
+            ## if( class(te)=="{")
+            ##     te[[1]] <- .sub(te[[1]])
+            if (is.recursive(te) && typeof(te) != "special"){
+                src <- getSrcref(te)
+                if(isECall(te[[i]])){
+                    fname <- as.character(te[[i]][[2]])
+                    if(length(expand <- get(fname, where)) &&
+                       is.null(accum[[fname]])){
+                        accum[[fname]] <- 1
+                        expand <- .sub(expand)[[1]] ## get rid of "expression"
+                        subst <- list(e = te[[i]],
+                                      file = paste0(
+                                        "defined in ", .getType(.get_form_host(where, fname)),
+                                        ' (from ', utils::getSrcFilename(expand),
+                                        "#", utils::getSrcLocation(expand,"line")[[1]], ")"))
+                        ## if(class(expand) == "{")
+                        ##     tte <- c(expand[[1]], substitute(e(file), subst), expand[-1])
+                        ## else{
+                        tte <- substitute({e(file);expand}, subst)
+                        tte[[3]] <- expand ## preserve srcref
+                        te[[i]] <- tte
+                    }
+                } else if (is.recursive(te[[i]]))
+                    te[[i]] <- .sub(te[[i]])
+            }}
+        te
     }
+
+    accum <- new.env()
+    where <- x@environment
+    ## first one is alwyas recursive expression
+    cat(paste0("## ", x@form_name,  " defined in [",
+               .getType(.get_form_host(where, x@form_name)), "] (from ",
+                getSrcFilename(x[[1]]), "#", getSrcLocation(x[[1]])[[1]], ")\n"))
+    out <- .sub(x@.Data)
+    ## names(out) <- NULL
+    out <- capture.output(print(out))
+    cat(gsub("e[(](.*).\"(.*)\"", "## e(\\1 \\2", out), sep = "\n")
 }
+
+
+## te <- expression(if(ab) e(pp))
+## pp <- expression(a + b)
+## tsub(te)
 
 .show_ProtoFormWithEnv <- function(object)
     .print_ProtoFormWithEnv(object, code = TRUE)
@@ -1877,6 +1926,15 @@ list(typeA = c('foo', 'bar'), typeB = ...)"
     all_names
 }
 
+.get_form_host <- function(cell, form_name){
+    "Get the form's host cell. No checks. return empty env if not found"
+    cellEnv <- as.environment(cell)
+    while(!(exists(form_name, cellEnv, inherits = F) || identical(cellEnv, emptyenv()))){
+        cellEnv <- parent.env(cellEnv)
+    }
+    cellEnv[[".self"]]
+}
+
 
 .infer_type_cell <- function(cell){
     " looks in the .type field if that is --, returns the symbol cell,
@@ -1892,7 +1950,7 @@ if not a symbol, returns NULL"
 
 ## *******************
 .setType <- function(object, type){
-    if(is(object, "protoCellInfo"))
+    if(is(object, "protoCellDefinition"))
         object[["type"]] <- type
     else if (is(object, "protoCell"))
         assign(".type", type, envir = object)
@@ -1902,10 +1960,10 @@ if not a symbol, returns NULL"
 }
 
 .getType <- function(object, fullName = T, collapse = "."){
-    if(is(object, "protoCellInfo")) return(object[["type"]])
+    if(is(object, "protoCellDefinition")) return(object[["type"]])
     if(is.null(object)) return("NULL")
     if(!is(object, "envProtoClass"))
-        stop("The 'object' argument must be of class 'protoCellInfo' or 'envProtoClass',  suplied an object of class ",  class(object))
+        stop("The 'object' argument must be of class 'protoCellDefinition' or 'envProtoClass',  suplied an object of class ",  class(object))
     if(fullName){
         type_local <- function(x, type_chain){
             x <- as.environment(x)
@@ -1921,7 +1979,6 @@ if not a symbol, returns NULL"
         as.environment(object)[[".type"]]
     }
 }
-
 
 
 ###_* GRAPH
@@ -2010,7 +2067,7 @@ leafNames <- function(cellContainer){
 ##             fill <- brewer.pal(max(length(levels(type)), 3L), fill)
 ##         }
 ##         nrt <- length(levels(type))
-##         nodeRenderInfo(x) <-
+##         nodeRenderDefinition(x) <-
 ##             list(lwd = localTypeProps(lwd, nrt, type, nodeNames),
 ##                  cex = localTypeProps(cex, nrt, type, nodeNames),
 ##                  textCol = localTypeProps(textCol, nrt, type, nodeNames),
@@ -2024,7 +2081,7 @@ leafNames <- function(cellContainer){
 ##         names(type) <- edgeNames <- gsub("\\|", "~", edgeNames)
 ##         ## if(is.character(fill) && length(fill) == 1L)
 ##         ##     fill <- brewer(max(length(levels(type)), 3L), fill)
-##         edgeRenderInfo(x) <-
+##         edgeRenderDefinition(x) <-
 ##             list(col = localTypeProps(fill, nrt, type, edgeNames))
 ##         ## LAYOUT
 ##         layoutType <- layoutType[[1]]
@@ -2219,8 +2276,8 @@ print.infoForms <- function(x, ...){
 ## close(template)
 ## browseURL(File)
 
-## browseInfo <-
-##     function (x, File, title = "Info Browser", header1 = "", header2 = "",
+## browseDefinition <-
+##     function (x, File, title = "Definition Browser", header1 = "", header2 = "",
 ##               openBrowser = TRUE, stylesheet = "info.dark", ...)
 ## {
 ##     ## x should be a df.
@@ -2274,20 +2331,20 @@ print.infoForms <- function(x, ...){
 ##     assign("stylesheet", basename(css))
 ##     brew(template, File, envir = xenv)
 ##     close(template)
-##     FileInfo <- file.info(File)
-##     if (is.na(FileInfo$size) || FileInfo$size <= 0) {
-##         if (is.na(FileInfo$size)) {
+##     FileDefinition <- file.info(File)
+##     if (is.na(FileDefinition$size) || FileDefinition$size <= 0) {
+##         if (is.na(FileDefinition$size)) {
 ##             stop("Brew did not create file ", File)
 ##         }
 ##         else {
 ##             stop("Brew created a file of size 0")
 ##         }
 ##     }else if (openBrowser) {
-##         if (is.na(FileInfo$size)) {
+##         if (is.na(FileDefinition$size)) {
 ##             warning("Did not create file ", File, ";  nothing to give to a browser.")
 ##         }
 ##         else {
-##             if (FileInfo$size <= 0) {
+##             if (FileDefinition$size <= 0) {
 ##                 warning("0 bytes in file ", File, ";  nothing to give to a browser.")
 ##             }
 ##             else {
@@ -2305,9 +2362,9 @@ print.infoForms <- function(x, ...){
 ##         title <- gettextf("Form info for %s of type \" %s\"",
 ##                           class(pObject), .getType(pObject))
 ##         header1 <- title
-##         header2 <- paste("Info for the following names: \n",
+##         header2 <- paste("Definition for the following names: \n",
 ##                          paste(names, collapse = ", "))
-##         browseInfo(x, title = title, header1 = header1, header2 = header2, stylesheet = source, ...)
+##         browseDefinition(x, title = title, header1 = header1, header2 = header2, stylesheet = source, ...)
 ##     }
 
 source("~/works/protoClasses/R/classes.R")
