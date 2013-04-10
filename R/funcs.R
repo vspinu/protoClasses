@@ -139,6 +139,12 @@ isRoot <- function(envProtoObj)
 .signAsRoot <- function(envProtoObj)
     assign(.rootMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
 
+.gen_mirr_name <- function(mname)
+    paste0("_", mname)
+
+isMirror <- function(obj)
+    exists("._mirror", obj, inherits = F) && get("._mirror", obj)
+
 ##' Return TRUE is it's a default context
 ##'
 ##' @param envProtoObj Object from a subclass of envProtoClass
@@ -226,76 +232,88 @@ create_specialised_accesor <- function(type){
                                .getType(.self)
                            else stop("Cannot assign extended type.")
                        }),
-                     m = protoField(create_specialised_accesor(".methods")),
-                     f = protoField(create_specialised_accesor(".fields")),
-                     h = protoField(create_specialised_accesor(".forms"))),
+                     proto = protoField(
+                       function(value){
+                           if(missing(value))
+                               .prototype
+                           else stop("Cannot reasign prototype.")
+                       }), 
+                     M = protoField(create_specialised_accesor(".methods")),
+                     F = protoField(create_specialised_accesor(".fields")),
+                     H = protoField(create_specialised_accesor(".forms"))),
                 where = objEnv)
     .setField(objEnv, "type", type)
 
     ## BASIC METHODS
     .initMethods(list(
-                   initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       dots <-
-                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                           else  c(list(...), .list)
-                       .initMethods(dots, .self)
-                   },
-                   setMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       dots <-
-                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                           else c(list(...), .list)
-                       .generic_setter(dots, .self, ".methods")
-                   },
-                   initFields = function(..., .list = list(), .classes = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv) {
-                       dots <-
-                           if(changeCallEnv){
-                               .classes <- eval(substitute(.classes), envir = .self)
-                               eval(substitute(c(list(...), .list)), envir = .self)
-                           }else  c(list(...), .list)
-                       .initFields(dots, .self, .classes)
-                   },
-                   setFields = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       dots <-
-                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                           else c(list(...), .list)
-                       .generic_setter(dots, .self, ".fields")
-                   },
-                   initForms = function(..., .list = list(), after = NULL,  changeCallEnv = getOption("protoClasses")$changeCallEnv) {
-                       dots <-
-                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                           else c(list(...), .list)
-                       .initForms(dots, .self, after = after)
-                   },
-                   setForms = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       dots <-
-                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                           else c(list(...), .list)
-                       .generic_setter(dots, .self, ".forms")
-                   },
-                   methods = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       dots <-
-                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                           else  list(...)
-                       .generic_getter(dots, .self, ".methods")
-                   },
-                   fields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       dots <-
-                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                           else  list(...)
-                       .generic_getter(dots, .self, ".fields")
-                   },
-                   forms = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
-                       dots <-
-                           if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                           else  list(...)
-                       .generic_getter(dots, .self, ".forms")
-                   },
-                   expr = function(expr){
-                       invisible(eval(substitute(expr), envir = .self))
-                   }),
+      initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+          dots <-
+              if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+              else  c(list(...), .list)
+          .initMethods(dots, .self)
+      },
+      setMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+          dots <-
+              if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+              else c(list(...), .list)
+          .generic_setter(dots, .self, ".methods")
+      },
+      initFields = function(..., .list = list(), .classes = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv) {
+          dots <-
+              if(changeCallEnv){
+                  .classes <- eval(substitute(.classes), envir = .self)
+                  eval(substitute(c(list(...), .list)), envir = .self)
+              }else  c(list(...), .list)
+          .initFields(dots, .self, .classes)
+      },
+      setFields = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+          dots <-
+              if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+              else c(list(...), .list)
+          .generic_setter(dots, .self, ".fields")
+      },
+      initForms = function(..., .list = list(), after = NULL,  changeCallEnv = getOption("protoClasses")$changeCallEnv) {
+          dots <-
+              if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+              else c(list(...), .list)
+          .initForms(dots, .self, after = after)
+      },
+      setForms = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+          dots <-
+              if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+              else c(list(...), .list)
+          .generic_setter(dots, .self, ".forms")
+      },
+      methods = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+          dots <-
+              if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+              else  list(...)
+          .generic_getter(dots, .self, ".methods")
+      },
+      fields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+          dots <-
+              if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+              else  list(...)
+          .generic_getter(dots, .self, ".fields")
+      },
+      forms = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+          dots <-
+              if(changeCallEnv) eval(substitute(list(...)), envir = .self)
+              else  list(...)
+          .generic_getter(dots, .self, ".forms")
+      },
+      debug = function(..., .methods, .fields, .forms){
+          .debugObjects(list(...), .methods = c(), .fields = c(), .forms = c(), .where = .self)
+      }, 
+      undebug = function(..., .methods = c(), .fields = c(), .forms = c(), .where = .self){
+          .undebugObjects(list(...), .methods, .fields, .forms, .where = .self)
+      },
+      inspect = function()
+          eval(substitute({browser(skipCalls = 2);browser(skipCalls = 2)}), envir = .self), 
+      expr = function(expr){
+          invisible(eval(substitute(expr), envir = .self))
+      }),
                  where = objEnv)
-
-
     ## "USER" FIELDS:
     .initFields(initFields, .Object)
     .initMethods(initMethods, .Object)
@@ -827,6 +845,12 @@ assign form with formName otherwise.
            .methods = {getFUN <- .getMethod},
            .cells = {getFUN <- .getCell},
            stop("Unrecognized setter type", container_name))
+    ## outclass <-
+    ##     switch(container_name,
+    ##            .fields = "protoFieldSET",
+    ##            .forms = "protoFormSET", 
+    ##            .methods = "protoMethodSET", 
+    ##            .cells = "protoCellSET")
     .extract <-
         function(names, selfEnv){
             lapply(names, function(nm){
@@ -835,8 +859,7 @@ assign form with formName otherwise.
                     stop("Can not find object \"", nm, "\"")
                 else
                     out
-            })
-        }
+            })}
     if(length(dots) == 0){
         ## GET all names
         names <- .get_all_names(get(container_name, envir = selfEnv))
@@ -847,7 +870,7 @@ assign form with formName otherwise.
             stop("Accessor accepts only character vectors or lists of character vectors.")
         if(!all(nzchar(names)))
             stop("Accessor accepts only nonempty names")
-        setNames(.extract(names, selfEnv), names)
+        setNames(.extract(names, selfEnv), names = names)
     }
 }
 
@@ -1047,17 +1070,22 @@ If name is aa.bb, all the registered forms starting with aa.bb will
 }
 
 .dollarSet_envProtoClass <- function(x, name, value){
-    out <- .setMethod(x, name, value, error=FALSE)
-    if(missing(out)){
-        out <- .setField(x, name, value, error = FALSE)
+    ## if(exists("._setter_redirect_to_", x, inherits = F)){
+    ##     .dollarSet_envProtoClass(get("._setter_redirect_to_", x), name, value)
+    ##     invisible(x)
+    ## }else{
+        out <- .setMethod(x, name, value, error=FALSE)
         if(missing(out)){
-            out <- .setForm(x, name, value, error = FALSE)
-            if(missing(out))
-                stop("\"", name, "\" is not a valid object in the protoObject of type '", .getType(x), "'")
+            out <- .setField(x, name, value, error = FALSE)
+            if(missing(out)){
+                out <- .setForm(x, name, value, error = FALSE)
+                if(missing(out))
+                    stop("\"", name, "\" is not a valid object in the protoObject of type '", .getType(x), "'")
+            }
         }
+        invisible(x)
     }
-    invisible(x)
-}
+
 
 .dollarGet_protoContext <- function(x, name){
     if(!is.null(obj <- .getCell(name, as.environment(x))))
@@ -1146,7 +1174,7 @@ If name is aa.bb, all the registered forms starting with aa.bb will
                         dummyName = metaName,
                         dummyClass = className)))
         }
-    }
+    }    
     ## .Object@className <- if(length(className) == 0L)  "custom" else className
     .Object
 }
@@ -1297,7 +1325,7 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     containerEnv <- as.environment(container)
     if(identical("--", as.environment(cell)[[".type"]]))
         stop("Cannot install cell of type \"--\"; please supply the type argument.")
-
+    
     ## KEEP CLONING and INSERTING  prototypes when not in the container
     cell_to_return <- cell
     prototype <- .getPrototype(cell)
@@ -1353,7 +1381,7 @@ cellFromDefinition <- function(protoCellDefinition, homeContext){
 homeContext <- function(cell)
     get(".homeContext", envir = cell)
 
-C <- function(...){
+defC <- function(...){
     args <- list(...)
     args[["Class"]] <- NULL
     new("protoCellDefinition", args, cellClass = "protoCell")
@@ -1364,14 +1392,6 @@ C <- function(...){
     assign(bindName, bindDefinition, envir = container)
 }
 
-.installBinding_protoCell <- function(bindDefinition, container, bindName, ...){
-    ## bindName has precedence:
-    if(!missing(bindName) && !identical(bindName, ""))
-        assign("type", bindName, envir = bindDefinition)
-    else
-        bindName <- get("type", envir = bindDefinition)
-    .installCellInContainer(bindDefinition, container = container)
-}
 
 .installBinding_protoCellDefinition <- function(bindDefinition, container, bindName, ...){
     if(!missing(bindName) && !identical(bindName, ""))
@@ -1586,7 +1606,6 @@ areIdenticalPBM <- function(pbm1, pbm2){
         no.list = TRUE)
 }
 
-
 .show_EnvProtoObject <- function(object){
     callNextMethod()
     ## Show the context in the future  here (todo)
@@ -1616,7 +1635,6 @@ areIdenticalPBM <- function(pbm1, pbm2){
     ## methods:::.printNames("Forms: ", ls(objEnv[[".forms"]], all.names = TRUE))
 }
 
-
 .show_Context <- function(object){
     callNextMethod()
     objEnv <- as.environment(object)
@@ -1630,7 +1648,6 @@ areIdenticalPBM <- function(pbm1, pbm2){
     print(data.frame(` ` = cell_names[order(rev_names)], check.names = FALSE))
     cat("\n")
 }
-
 
 .show_Container <- function(object){
     ## callNextMethod()
@@ -1742,39 +1759,109 @@ areIdenticalPBM <- function(pbm1, pbm2){
     .infoContainer(.get_all_names(.forms), object, ".fields")
 }
 
-
 ###_* UTILITIES
-.insertBrowserInForm <- function(form){
-    form_browser <- as(c(expression(browser = browser()), original = form),
-                       "protoFormWithBrowser")
-    form_browser@original <- as(as.expression(form), "protoForm")
-    form_browser
+## .formWithBrowser <- function(form){
+##     form_browser <- as(c(expression(browser = browser()), original = form),
+##                        "protoFormWithBrowser")
+##     form_browser
+## }
+
+.debugObjects <- function(names, .methods = c(), .fields = c(), .forms = c(), .where){
+    names <- unlist(names)
+    for( nm in names)
+        if(exists(nm, .where[[".fields"]]))
+            .fields <- c(nm, .fields)
+        else if(exists(nm, .where[[".methods"]]))
+            .methods <- c(nm, .methods)
+        else if(exists(nm, .where[[".forms"]]))
+            .forms <- c(nm, .forms)
+    for(nm in .methods)
+        .mark_for_debug(nm, .where[[".methods"]], "method")
+    for(nm in .fields)
+        .mark_for_debug(nm, .where[[".fields"]], "field")
+    for(nm in .forms)
+        .mark_for_debug(nm, .where[[".forms"]], "form")
 }
 
-.debugForm <- function(form_name, where){
-    form <- .getForm(form_name, where)
-    if(missing(form))
-        stop("Form \"", form_name, "\" is not found in the cell of type \"", .getType(where), "\"")
-    form_browser <- .insertBrowserInForm(form)
-    form_browser@hostEnv <- where
-    form_browser@isInHost <- exists(form_name, envir = where, inherits = FALSE)
-    assign(form_name, form_browser, envir = where)
-    invisible(form_name)
+.undebugObjects <- function(names, .methods = c(), .forms = c(), .fields = c(), .where){
+    if(length(names) == 0 && length(.methods) == 0 && length(.forms) == 0 && length(.fields) == 0)
+        stop("undebuggin all objects is not implemlented yet")
+    names <- unlist(names)
+    for( nm in names)
+        if(exists(nm, .where[[".fields"]]))
+            .fields <- c(nm, .fields)
+        else if(exists(nm, .where[[".methods"]]))
+            .methods <- c(nm, .methods)
+        else if(exists(nm, .where[[".forms"]]))
+            .forms <- c(nm, .forms)
+    for(nm in .methods)
+        .unmark_for_debug(nm, .where[[".methods"]])
+    for(nm in .fields)
+        .unmark_for_debug(nm, .where[[".fields"]])
+    for(nm in .forms)
+        .unmark_for_debug(nm, .where[[".forms"]])
+}
+        
+.funcWithBrowser <- function(func){
+    b <- quote({br;body})
+    attributes(b) <- NULL
+    b[[2]] <- quote(browser())
+    b[[3]] <- body(func)
+    body(func) <- b
+    func
 }
 
-.undebugForm <- function(form_name, where){
-    form <- .getForm(form_name, where)
-    if(missing(form))
-        stop("Form \"", form, "\" is not found in the cell of type \"", .getType(where), "\"")
-    if(is(form, "protoFormWithBrowser")){
-        remove(list = form_name, envir = form@hostEnv)
-        if(form@isInHost)
-            assign(form_name, form@original, envir = form@hostEnv)
-    }else{
-        stop("form \"", form_name, "\"is not marked for debugging")
+.mark_for_debug <- function(obj_name, where, type = "form"){
+    if(!exists(obj_name, where))
+        stop(type, " \"", obj_name, "\" is not found in the cell of type \"", .getType(where), "\"")
+    obj <- get(obj_name, where)
+    if(is(obj, "protoObjectWithBrowser"))
+        warn.pbm("Object \"", obj_name, "\" is already marked for debugging; skipping.")
+    else{
+        obj_wbr <-
+            switch(type,
+                   form = new("protoFormWithBrowser", c(expression(browser = browser()), original = form)), 
+                   method = new("protoMethodWithBrowser", .funcWithBrowser(obj)),
+                   field = new("protoFieldWithBrowser", .funcWithBrowser(obj)), 
+                   stop("unrecognised type, should be one of form, method or field."))
+        obj_wbr@original <- obj
+        obj_wbr@hostEnv <- where
+        obj_wbr@isInHost <- exists(obj_name, envir = where, inherits = FALSE)
+        assign(obj_name, obj_wbr, envir = where)
     }
+    invisible(obj_name)
 }
 
+.unmark_for_debug <- function(obj_name, .where){
+    obj <- get(obj_name, .where, inherits = FALSE)
+    remove(list = obj_name, envir = .where)
+    if(obj@isInHost)
+        assign(obj_name, obj@original, envir = .where)
+}
+
+## .debugForm <- function(form_name, where){
+##     form <- .getForm(form_name, where)
+##     if(missing(form))
+##         stop("Form \"", form_name, "\" is not found in the cell of type \"", .getType(where), "\"")
+##     form_browser <- .insertBrowserInForm(form)
+##     form_browser@hostEnv <- where
+##     form_browser@isInHost <- exists(form_name, envir = where, inherits = FALSE)
+##     assign(form_name, form_browser, envir = where)
+##     invisible(form_name)
+## }
+
+## .undebugForm <- function(form_name, where){
+##     form <- .getForm(form_name, where)
+##     if(missing(form))
+##         stop("Form \"", form_name, "\" was not found in cell \"", .getType(where), "\"")
+##     if(is(form, "protoFormWithBrowser")){
+##         remove(list = form_name, envir = form@hostEnv)
+##         if(form@isInHost)
+##             assign(form_name, form@original, envir = form@hostEnv)
+##     }else{
+##         stop("form \"", form_name, "\"is not marked for debugging")
+##     }
+## }
 
 .complete_partial_name <- function(name, container){
     ## return the full name from the container
@@ -1959,30 +2046,27 @@ if not a symbol, returns NULL"
     object
 }
 
-.getType <- function(object, fullName = T, collapse = "."){
+.getType <- function(object, fullName = T, collapse = ".", base_only = FALSE){
     if(is(object, "protoCellDefinition")) return(object[["type"]])
     if(is.null(object)) return("NULL")
-    if(!is(object, "envProtoClass"))
-        stop("The 'object' argument must be of class 'protoCellDefinition' or 'envProtoClass',  suplied an object of class ",  class(object))
-    if(fullName){
-        type_local <- function(x, type_chain){
-            x <- as.environment(x)
-            if(isRoot(x)) c(type_chain, x[[".type"]])
-            else Recall(x[[".prototype"]], c(type_chain, x[[".type"]]))
-        }
-        type <- type_local(object, c())
-        if(is.character(collapse))
-            paste(type, collapse = collapse)
-        else
-            type
-    }else{
-        as.environment(object)[[".type"]]
+    ## if(!is(object, "envProtoClass"))
+    ##     stop("The 'object' argument must be of class 'protoCellDefinition' or 'envProtoClass',  suplied an object of class ",  class(object))
+    object <- as.environment(object)
+    ## fixme: simplify these two similar cases
+    type_local <- function(x){
+        x <- as.environment(x)
+        if(isMirror(x))
+            if(base_only) Recall(x[[".prototype"]])
+            else c(x[[".type"]], Recall(x[[".prototype"]]))
+        else if(isRoot(x) || !fullName) x[[".type"]]
+        else c(x[[".type"]], Recall(x[[".prototype"]]))
     }
+    if(is.character(collapse)) paste(type_local(object), collapse = collapse)
+    else type_local(object)
 }
 
 
 ###_* GRAPH
-
 leafNames <- function(cellContainer){
     "return leaf cells names from the container"
     cont_env <- as.environment(cellContainer)

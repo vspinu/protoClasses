@@ -9,6 +9,17 @@ if(existsMethod("initialize", "protoCell"))
 setGeneric("installBinding",
            def = function(bindDefinition, container, bindName, ...) standardGeneric("installBinding"),
            useAsDefault = .installBinding_default)
+
+setMethod("installBinding", "protoCell",
+          function(bindDefinition, container, bindName, ...){
+              ## bindName has precedence:
+              if(!missing(bindName) && !identical(bindName, ""))
+                  assign("type", bindName, envir = bindDefinition)
+              else
+                  bindName <- get(".type", envir = bindDefinition)
+              .installCellInContainer(bindDefinition, container = container)
+          })
+
 setGeneric("initializeRoot", function(.Object, ...) standardGeneric("initializeRoot"))
 setGeneric("clone",
            def = function(x, ...) standardGeneric("clone"),
@@ -17,7 +28,7 @@ setGeneric("clone",
 
 ###_ FUNDAMENTAL OBJECTS:
 
-###__ INFO:
+###__ DEFINITIONS:
 ###___ protoCellDefinition
 setClass("protoCellDefinition",
          representation(cellClass = "character",
@@ -32,7 +43,6 @@ setMethod("installBinding", "protoCellDefinition",
 setClass("protoFormDefinition",
          representation(formClass = "character"),
          prototype(formClass = "protoForm")) # add host protoObject?
-
 
 ###__ CORE:
 setClass("protoFunction",
@@ -64,6 +74,8 @@ protoField <- function(func = function(value) NULL ,  doc = "", ...)
 
 setMethod("installBinding", "protoField",
           .installBinding_protoField)
+
+
 
 ###___ protoForm
 ##' Class to represent protoForms.
@@ -125,11 +137,24 @@ setMethod("print", signature(x = "protoFormWithEnv"),
           .print_ProtoFormWithEnv)
 
 ###___ protoFormWithBrowser
-setClass("protoFormWithBrowser",
-         representation(original = "protoForm",
+setClass("protoObjectWithBrowser",
+         representation(original = "ANY",
                         hostEnv = "environment",
-                        isInHost = "logical"),
-         contains = "protoForm")
+                        isInHost = "logical"))
+setClass("protoFormWithBrowser",
+         contains = c("protoForm", "protoObjectWithBrowser"))
+setClass("protoMethodWithBrowser",
+         contains = c("protoMethod", "protoObjectWithBrowser"))
+setClass("protoFieldWithBrowser",
+         contains = c("protoField", "protoObjectWithBrowser"))
+
+###__ SETS of proto objects
+## setClass("protoSET", representation(environment = "environment"), contains = "namedList")
+## setClass("protoFormSET", contains = "protoSET")
+## setClass("protoFieldSET", contains = "protoSET")
+## setClass("protoMethodSET", contains = "protoSET")
+## setClass("protoCellSET", contains = "protoSET")
+
 
 
 ###_ PROTO:
@@ -161,8 +186,8 @@ setMethod("clone", "envProtoClass",
 ##' 
 setMethod("$",
           signature(x = "envProtoClass"),
-          definition = .dollarGet_envProtoClass
-          )
+          definition = .dollarGet_envProtoClass)
+
 
 ##'
 ##' @rdname dollar
@@ -275,8 +300,6 @@ protoCell <- function(
         initForms = initForms, forms = forms,
         expr = expr, ...)
 
-setMethod("installBinding", "protoCell",
-          .installBinding_protoCell)
 
 ###__ protoContainer
 setClass("protoContainer",
@@ -307,6 +330,7 @@ setMethod("show", signature(object = "protoContainer"),
 setGeneric("specialNames", def = function(protoObject) standardGeneric("specialNames"),
            useAsDefault = function(protoObject) character())
 
+
 ###__ formContainer
 setClass("formContainer",
          prototype = prototype(typeContainer = ".forms"),
@@ -315,6 +339,7 @@ setMethod("$", signature(x = "formContainer"),
           .dollarGet_formContainer)
 setMethod("$<-", signature(x = "formContainer"),
           function(x, name) .dollarSet_formContainer(x, name, value))
+
 
 ###__ methodContainer
 setClass("methodContainer",
@@ -329,6 +354,7 @@ setMethod("specialNames", "methodContainer",
           function(protoObject) c("cells", "expr", "fields", "forms", "initCells", "initFields", 
                                   "initForms", "initMethods", "methods", "setFields", "setForms", 
                                   "setMethods"))
+
 
 ###__ fieldContainer
 setClass("fieldContainer",
