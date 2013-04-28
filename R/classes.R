@@ -1,3 +1,5 @@
+protoClasses_debug_mode <- TRUE
+
 if(existsMethod("initialize", "envProtoClass"))
     removeMethod("initialize", "envProtoClass")
 if(existsMethod("initialize", "protoContext"))
@@ -69,8 +71,29 @@ setClass("protoField",
          contains = "protoFunction")
 setMethod("initialize", signature(.Object = "protoField"),
           .initialize_Field)
-protoField <- function(func = function(value) NULL ,  doc = "", ...)
+
+
+protoField <- function(func = function(value) NULL ,  doc = "", ...){
+    subfunc <- substitute(func)
+    if(protoClasses_debug_mode && is.name(subfunc) && is.function(func))
+        func <- eval(substitute(
+          function(value){
+              loc_func <- func_name
+              environment(loc_func) <- .self
+              loc_func(value)
+          }, list(func_name = subfunc)))
     new("protoField", func, doc = doc, ...)
+}
+
+protoReadOnlyField <- function(object_name)
+    protoField(eval(substitute(
+      function(obj){
+          if(missing(obj)){
+              get(obj_name, .self)
+          }else{
+              stop("field '", obj_name, "' is readonly")
+          }
+      }, list(obj_name = object_name))))
 
 setMethod("installBinding", "protoField",
           .installBinding_protoField)
