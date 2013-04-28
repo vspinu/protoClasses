@@ -154,10 +154,53 @@ setMethod("[",
 setClass("protoFormWithEnv",
          representation(environment = "environment", form_name = "character"),
          contains = "protoForm") ## used for printing, $ methods returns this object with environment slot set to .self
+
 setMethod("show", signature(object = "protoFormWithEnv"),
-          .show_ProtoFormWithEnv)
+          function(object) .print_ProtoFormWithEnv(object, code = TRUE))
+
 setMethod("print", signature(x = "protoFormWithEnv"),
-          .print_ProtoFormWithEnv)
+          function(x, code = TRUE, ...){
+              .sub <- function(te){
+                  for( i in seq_along(te)){
+                      ## if( class(te)=="{")
+                      ##     te[[1]] <- .sub(te[[1]])
+                      if (is.recursive(te) && typeof(te) != "special"){
+                          src <- getSrcref(te)
+                          if(isECall(te[[i]])){
+                              fname <- as.character(te[[i]][[2]])
+                              if(length(expand <- get(fname, where)) &&
+                                 is.null(accum[[fname]])){
+                                  accum[[fname]] <- 1
+                                  expand <- .sub(expand)[[1]] ## get rid of "expression"
+                                  subst <- list(e = te[[i]],
+                                                file = paste0(
+                                                  "defined in ", .getType(.get_form_host(where, fname)),
+                                                  ' (from ', utils::getSrcFilename(expand),
+                                                  "#", utils::getSrcLocation(expand,"line")[[1]], ")"))
+                                  ## if(class(expand) == "{")
+                                  ##     tte <- c(expand[[1]], substitute(e(file), subst), expand[-1])
+                                  ## else{
+                                  tte <- substitute({e(file);expand}, subst)
+                                  tte[[3]] <- expand ## preserve srcref
+                                  te[[i]] <- tte
+                              }
+                          } else if (is.recursive(te[[i]]))
+                              te[[i]] <- .sub(te[[i]])
+                      }}
+                  te
+              }
+
+              accum <- new.env()
+              where <- x@environment
+              ## first one is alwyas recursive expression
+              cat(paste0("## ", x@form_name,  " defined in [",
+                         .getType(.get_form_host(where, x@form_name)), "] (from ",
+                         getSrcFilename(x[[1]]), "#", getSrcLocation(x[[1]])[[1]], ")\n"))
+              out <- .sub(x@.Data)
+              ## names(out) <- NULL
+              out <- capture.output(print(out))
+              cat(gsub("e[(](.*).\"(.*)\"", "## e(\\1 \\2", out), sep = "\n")
+          })
 
 ###___ protoFormWithBrowser
 setClass("protoObjectWithBrowser",
@@ -195,10 +238,45 @@ setAs("environment", "envProtoClass", function(from){
     print("COOOl")
     from
 })
+
 setMethod("show", signature(object = "envProtoClass"),
-          .show_EnvProtoObject)
-setMethod("clone", "envProtoClass",
-          .clone_envProtoClass)
+          function(object) print(object))
+
+setMethod("print", signature(x = "envProtoClass"),
+          function(x, verbose = FALSE){
+              object <- x
+              cat("Proto Object of class \"", class(x),"\" ", format(as.environment(x)), "\n\n", sep = "")
+              ## Show the context in the future  here (todo)
+              objEnv <- as.environment(object)
+              cat(" Type: \"", .getType(object), "\"\n", sep = "")
+              cat(" Is Root: ", isRoot(object), "\n")
+              cat(" Is Mirror: ", isMirror(object), "\n")
+              VL <- 50
+              bar <- "\t--------------------------------  \n"
+              if(verbose){
+                  methods:::.printNames("All objects: ", ls(objEnv, all.names = TRUE))
+                  cat(" Containers:\n")
+                  cat(" \n+ Fields:", bar)
+                  str(.get_all_names_with_host(object[[".fields"]]), vec.len = VL)
+                  ## print(.infoContainer(.get_all_names(objEnv[[".fields"]]), objEnv, ".fields"))
+                  cat(" \n+ Methods:", bar)
+                  str(.get_all_names_with_host(object[[".methods"]]), vec.len = VL)
+                  ## print(.infoContainer(.get_all_names(objEnv[[".methods"]]), objEnv, ".methods"))
+                  cat(" \n+ Forms:", bar)
+                  str(.get_all_names_with_host(object[[".forms"]]), vec.len = VL)
+              }
+              ## for forms look in objEnv directly:
+              ## print(infoForms(objEnv))
+              ## str(list(Fields =  .get_all_names(objEnv[[".fields"]]),
+              ##          Methods = .get_all_names(objEnv[[".methods"]]),
+              ##          Forms = .get_all_names(objEnv[[".forms"]])),
+              ##     no.list = TRUE, vec.len = 20, give.head = FALSE)
+              ## methods:::.printNames("Fields: ", ls(objEnv[[".fields"]], all.names = TRUE))
+              ## methods:::.printNames("Methods: ", ls(objEnv[[".methods"]], all.names = TRUE))
+              ## methods:::.printNames("Forms: ", ls(objEnv[[".forms"]], all.names = TRUE))
+          })
+
+setMethod("clone", "envProtoClass", .clone_envProtoClass)
 
 ##' Dollar accessors of envProtoClasses
 ##'
@@ -223,6 +301,26 @@ setMethod("$<-",
 ##' Class to represent proto contexts
 ##' @export
 setClass("protoContext", contains = "envProtoClass")
+
+setMethod("initializeRoot", "protoContext",
+          .initializeRoot_protoContext)
+setMethod("show", signature(object = "protoContext"),
+          function(object){
+              callNextMethod()
+              objEnv <- as.environment(object)
+              VL = 50
+              bar <- "\t--------------------------------  \n"
+              cat("\n+ Cells:", bar)
+              ## str(.get_all_names_with_host(".cells", objEnv), vec.len = VL)
+              cell_names <- ls(objEnv[[".cells"]], all.names = TRUE)
+              rev_names <- strsplit(cell_names, ".", fixed = TRUE)
+              rev_names <- sapply(rev_names, function(el) paste(rev(el), collapse = "."))
+              print(data.frame(` ` = cell_names[order(rev_names)], check.names = FALSE))
+              cat("\n")
+          })
+setMethod("clone", "protoContext",
+          .clone_protoContext)
+
 
 ##' Constructor for protoContext objects
 ##'
@@ -252,14 +350,6 @@ protoContext <- function(
         initFields = initFields, fields = fields,
         initForms = initForms, forms = forms,
         expr = expr, ...)}
-
-
-setMethod("initializeRoot", "protoContext",
-          .initializeRoot_protoContext)
-setMethod("show", signature(object = "protoContext"),
-          .show_Context)
-setMethod("clone", "protoContext",
-          .clone_protoContext)
 
 ##' @rdname dollar
 setMethod("$",
