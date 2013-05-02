@@ -99,7 +99,6 @@ setMethod("installBinding", "protoField",
           .installBinding_protoField)
 
 
-
 ###___ protoForm
 ##' Class to represent protoForms.
 ##'
@@ -551,16 +550,5 @@ setMethod("setPrototype", "protoContext",
               callNextMethod()
               parent.env(get(".cells", envir = protoObj)) <- parent.env(get(".cells", envir = prototype))
           })
-
-
-## Rgraphvis functionality
-## setAs("cellContainer", "graphNEL", .as_cellContainer_graphNEL)
-## setAs("protoContext", "graphNEL", .as_cellContainer_graphNEL)
-
-
-## setMethod("plot", c("protoContext", "missing"),
-##           def= plotCellGraph )
-## setMethod("plot", c("protoContainer", "ANY"),
-##           def = plotCellGraph)
 
 
