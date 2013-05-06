@@ -1,32 +1,18 @@
 exportPattern("^[[:alpha:]]+")
+exportClassPattern("^[[:alpha:]]+")
+importFrom("graphics", plot)
+
 exportMethods(
     "$",
     "$<-",
     "[",
     "clone",
     "coerce",
-    "initialize",
-    "initializeRoot",
+    ## "initialize",
+    ## "initializeRoot",
     "installBinding",
-    "plot",
-    "print",
+    ## "plot", S3
+    ## "print", S3
     "setPrototype",
     "show" 
-)
-exportClasses(
-    "cellClassRepresentation",
-     "cellContainer",
-     "cellInfo",
-     "contextClassRepresentation",
-     "envProtoClass",
-     "formInfo",
-     "protoCell",
-     "protoContainer",
-     "protoContext",
-     "protoField",
-     "protoForm",
-     "protoFormWithBrowser",
-     "protoFormWithEnv",
-     "protoFunction",
-     "protoMethod" 
 )

@@ -1,0 +1,238 @@
+;; -*- mode: emacs-lisp; coding: emacs-mule; -*-
+;; --------------------------------------------------------------------------
+;; Desktop File for Emacs
+;; --------------------------------------------------------------------------
+;; Created Mon May  6 15:42:19 2013
+;; Desktop file format version 206
+;; Emacs version 24.3.2
+
+;; Global section:
+(setq desktop-missing-file-warning nil)
+(setq tags-file-name nil)
+(setq tags-table-list nil)
+(setq search-ring '("action" "containe" "field" "homeCon" "visit" "visi" "initializeRs" "cell" "newroo" "instal" "ess-command-" "evelo" "getT" ".ess_all_fu" "ess_find_" "end"))
+(setq regexp-search-ring '("su" "debu" "<-" "size" "debu" "author" "hist" "hi" "hist(" "tab" "mer" "whic" "whi" "tab" "val" "nc"))
+(setq register-alist nil)
+(setq file-name-history '("/home/vitoshka/works/protoClasses/R/protoContexts.R" "/home/vitoshka/works/protoClasses/R/protoContainers.R" "protoFields.R" "/home/vitoshka/works/protoClasses/R/protoCells.R" "/home/vitoshka/works/protoClasses/R/base.R" "/home/vitoshka/works/protoClasses/R/envProtoClass.R" "/home/vitoshka/works/protoClasses/R/base.R" "/home/vitoshka/works/pbm/R/hierarchy.R" "/home/vitoshka/.eESS.el" "/home/vitoshka/works/protoClasses/R/info.R" "/home/vitoshka/works/protoClasses/R/protoContainers.R" "/home/vitoshka/works/protoClasses/R/protoCells.R" "/home/vitoshka/works/protoClasses/R/protoContexts.R" "/home/vitoshka/works/protoClasses/R/withBrowser.R" "/home/vitoshka/works/protoClasses/R/clone.R" "/home/vitoshka/works/protoClasses/R/protoFields.R" "/home/vitoshka/works/protoClasses/R/withBrowser.R" "/home/vitoshka/works/protoClasses/R/protoClasses.R" "/home/vitoshka/works/protoClasses/R/protoForms.R" "/home/vitoshka/works/pbm/R/mirror.R" "/home/vitoshka/works/protoClasses/R/core.R" "/home/vitoshka/works/protoClasses/R/protoMethods.R" "/home/vitoshka/works/protoClasses/R/base.R" "/home/vitoshka/works/protoClasses/R/funcs.R" "/home/vitoshka/works/protoClasses/R/protoFields.R" "/home/vitoshka/works/protoClasses/R/protoForms.R" "/home/vitoshka/works/protoClasses/R/protoCell.R" "/home/vitoshka/works/protoClasses/R/classes.R" "/home/vitoshka/ESS/git/.git/MERGE_MSG" "/home/vitoshka/VC/lubridate/R/test.R"))
+
+;; Buffer section -- buffers listed in same order as in buffer list:
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/protoCells.R"
+  "protoCells.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  11972
+  '(11988 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/Dropbox/ELPA/helm-20130421.801/helm-grep.el"
+  "helm-grep.el"
+  'emacs-lisp-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode auto-complete-mode paredit-mode rainbow-delimiters-mode sr-popviewer-mode)
+  18387
+  '(34609 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . utf-8-unix)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/Dropbox/ELPA/helm-20130421.801/helm-files.el"
+  "helm-files.el"
+  'emacs-lisp-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode auto-complete-mode paredit-mode rainbow-delimiters-mode sr-popviewer-mode)
+  112111
+  '(112033 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . utf-8-unix)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/protoMethods.R"
+  "protoMethods.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  1634
+  '(2199 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/protoFields.R"
+  "protoFields.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  9351
+  '(9351 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/protoForms.R"
+  "protoForms.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  21209
+  '(21209 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/protoContexts.R"
+  "protoContexts.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  3489
+  '(1 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/Dropbox/.main/.eOTHER.el"
+  ".eOTHER.el"
+  'emacs-lisp-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode auto-complete-mode paredit-mode rainbow-delimiters-mode sr-popviewer-mode)
+  4603
+  '(4438 nil)
+  nil
+  nil
+  '((buffer-file-coding-system . utf-8-dos)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/envProtoClass.R"
+  "envProtoClass.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  4326
+  '(1926 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . utf-8-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/clone.R"
+  "clone.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode flyspell-mode)
+  1
+  '(4976 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/base.R"
+  "base.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  14385
+  '(14385 nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/Dropbox/ELPA/smartparens-20130426.242/smartparens.el"
+  "smartparens.el"
+  'emacs-lisp-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode auto-complete-mode paredit-mode rainbow-delimiters-mode sr-popviewer-mode)
+  27920
+  '(nil nil)
+  nil
+  nil
+  '((buffer-file-coding-system . utf-8-unix)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/info.R"
+  "info.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  1
+  '(nil nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/debug.R"
+  "debug.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  1
+  '(nil nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/#test.r#"
+  "#test.r#"
+  'fundamental-mode
+  '(global-auto-revert-mode sr-popviewer-mode)
+  1
+  '(nil nil)
+  nil
+  nil
+  '((buffer-file-coding-system . emacs-mule-unix)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/graph.R"
+  "graph.R"
+  'ess-mode
+  '(global-auto-revert-mode eldoc-mode hs-minor-mode smart-operator-mode auto-complete-mode rainbow-delimiters-mode sr-popviewer-mode)
+  1
+  '(nil nil)
+  nil
+  nil
+  '((indent-tabs-mode) (buffer-file-coding-system . undecided-unix) (truncate-lines . t)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/works/protoClasses/R/TAGS"
+  "TAGS"
+  'fundamental-mode
+  '(global-auto-revert-mode sr-popviewer-mode)
+  1
+  '(nil nil)
+  nil
+  nil
+  '((buffer-file-coding-system . undecided-unix)))
+
+(desktop-create-buffer 206
+  nil
+  "R (Sunrise)"
+  'sr-mode
+  '(global-auto-revert-mode sr-popviewer-mode dired-omit-mode)
+  288
+  '(nil nil)
+  t
+  '((dirs "/home/vitoshka/works/protoClasses/R/") (left . t) (sorting-order . "NUMBER"))
+  '((truncate-lines)))
+
+(desktop-create-buffer 206
+  nil
+  "R (Sunrise)<2>"
+  'sr-mode
+  '(global-auto-revert-mode sr-popviewer-mode dired-omit-mode)
+  549
+  '(nil nil)
+  t
+  '((dirs "/home/vitoshka/works/protoClasses/R/") (right . t) (sorting-order . "NUMBER"))
+  '((truncate-lines)))
+
+(desktop-create-buffer 206
+  "/home/vitoshka/Dropbox/.main/.newsrc-dribble"
+  ".newsrc-dribble"
+  'fundamental-mode
+  '(global-auto-revert-mode sr-popviewer-mode)
+  35064
+  '(nil nil)
+  nil
+  nil
+  '((buffer-file-coding-system . raw-text-unix)))
+

@@ -1,0 +1,9 @@
+paper
+.gitignore
+^.*\.Rproj$
+^\.Rproj\.user$
+.git
+README.md
+.Rproj.user
+.Rhistory
+.DS_Store

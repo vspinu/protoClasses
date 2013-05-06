@@ -2,11 +2,27 @@ Package: protoClasses
 Type: Package
 Title: Prototype programming with contexts and forms
 Version: 1.0
-Date: 2011-05-01
+Date: 2013-05-01
 Author: Vitalie Spinu
 Maintainer: Vitalie Spinu <spinuvit@gmail.com>
-Description: A contextual prototype programming paradigm for R. It takes the ideas of prototype object orientation and enriches them with contexts and forms. It's the first programming paradigm in R to allow inheritance of the code blocks.
+Description: A contextual prototype programming paradigm for R. It takes the
+             ideas of prototype object orientation and enriches them with
+             contexts and forms.
 License: GPL 
 Collate: funcs.R classes.R
 LazyLoad: yes
-Depends: methods
+Suggests: graph, Rgraphvis, testthat
+Depends: R (>= 3.0.0), methods
+BugReports: https://github.com/vitoshka/protoClasses/issues
+Collate:
+  "base.R"
+  "envProtoClass.R"
+  "protoFields.R"
+  "protoForms.R"
+  "protoMethods.R"
+  "protoCells.R"
+  "protoContexts.R"
+  "clone.R"
+  "debug.R"
+  "graph.R"
+  "info.R"

@@ -32,13 +32,12 @@ setAs("cellContainer", "graphNEL",
           .gr
       })
 
-
 ## ## gR <- as(M[[".cells"]], "graphNEL")
 ## ## str(renderGraph(layoutGraph(gR)))
 ## ## plot(gR)
 ## ## edges(gR)
-setMethod("plot", c("protoContainer", "ANY"),
-          function(x, y, col.prototype="cyan",
+## setMethod("plot", c("protoContainer", "ANY"),
+plot.protoContainer <- function(x, y, col.prototype="cyan",
                    col.leafs="yellow",
                    layoutType = c("dot", "neato", "twopi", "circo", "fdp"),
                    plot.root=F, types = NULL, 
@@ -99,7 +98,7 @@ setMethod("plot", c("protoContainer", "ANY"),
                   list(col = .local_type_props(fill, nrt, typeEdges, edgeNames))
               renderGraph(x)
               ## par(old_par)
-          })
+          }
 
 ## setMethod("plot", c("protoContext", "missing"),
 ##           def= plotCellGraph )

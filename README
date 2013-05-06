@@ -1,2 +1,2 @@
-A contextual prototype programming paradigm for R. It takes the ideas of prototype object orientation and enriches them with contexts and forms. It's the first programming paradigm in R to allow inheritance of the code blocks.
-
+A contextual prototype programming paradigm for R. It takes the ideas of
+prototype object orientation and enriches them with contexts and forms.
