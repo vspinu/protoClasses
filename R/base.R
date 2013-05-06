@@ -16,83 +16,29 @@
 ##' @keywords package prototype
 NULL
 
-## fixme: if TRUE  eval(substitute(list(...)) gets rid of source code !!!
-options(protoClasses = list(changeCallEnv = FALSE))
+###_ GUIDE
+## Rely only on internal implementation.
+## Always use as.environment (do not rely on [[]], or other user changeable methods)
+## All this funcs start with .
+## Do not rely on  objects methods (like $, methods, etc) (only func programming)
 
-
-protoClasses_debug_mode <- TRUE
-if(existsMethod("initialize", "envProtoClass"))
-    removeMethod("initialize", "envProtoClass")
-if(existsMethod("initialize", "protoContext"))
-    removeMethod("initialize", "protoContext")
-if(existsMethod("initialize", "protoCell"))
-    removeMethod("initialize", "protoCell")
-
-###_* META NAMES
-.rootMetaName <- ".|.root"
-.defaultMetaName <- ".|.defaultContext"
-
-.gen_mirr_name <- function(mname)
-    paste0("_", mname)
-
-isMirror <- function(obj)
-    exists("._mirror", obj, inherits = F) && get("._mirror", obj)
-
-.signAsRoot <- function(envProtoObj)
-    assign(.rootMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
-
-##' Return TRUE if envProtoObj is a root object
-##'
-##' @param envProtoObj Object from a subclass of envProtoClass
-##' @author Vitalie Spinu
-##' @export
-isRoot <- function(envProtoObj)
-    exists(.rootMetaName, envir = as.environment(envProtoObj), inherits = FALSE)
-
-newRoot <- function(Class, ...){
-    ClassDef <- getClass(Class, where = topenv(parent.frame()))
-    .Object <- .Call(methods:::C_new_object, ClassDef)
-    .Object@.xData <- new.env(TRUE, parent = topenv(parent.frame()))
-    initializeRoot(.Object, ...)
-}
-
-###_ CLASS REPRESENTATIONS:
-## Extension of classRepresentation to store two new slots: defaultContext and
-## classDef. each new protoContext class generates new classDef with it's
-## default context.
-.modifyAs <- function(classDef){
-    .coerce <-  classDef@contains[[1]]@coerce
-    body(.coerce) <- bquote({value <- .(body(.coerce))
-                             assign(".self", value, envir = value)
-                             value})
-    classDef@contains[[1]]@coerce <- .coerce
-    ## have to modify all he replace methods:
-    for(i in seq_along(classDef@contains)){
-        .replace <- classDef@contains[[i]]@replace
-        body(.replace) <- bquote({from <- .(body(.replace))
-                                  assign(".self", from, envir = from)
-                                  from})
-        classDef@contains[[i]]@replace <- .replace
-    }
-    classDef
-}
-
-###_ Basic Classes
+
+###_ CLASSES
 setClass("protoFunction",
          representation(changeCallEnv = "logical",
                         doc = "character"),
          prototype(changeCallEnv = FALSE),
          contains = "function")
 
-
-###_ Generic Methods:
+
+###_ METHODS:
+.installBinding_default <- function(bindDefinition, container, bindName, ...){
+    ## default methods just assigns the stuff in the container.
+    assign(bindName, bindDefinition, envir = container)
+}
 setGeneric("installBinding",
            def = function(bindDefinition, container, bindName, ...) standardGeneric("installBinding"),
-           useAsDefault =
-           function(bindDefinition, container, bindName, ...){
-               ## default methods just assigns the stuff in the container.
-               assign(bindName, bindDefinition, envir = container)
-           })
+           useAsDefault = .installBinding_default)
 
 setGeneric("initializeRoot",
            function(.Object, ...) standardGeneric("initializeRoot"))
@@ -111,17 +57,12 @@ setGeneric("setPrototype",
                parent.env(.methods) <- get(".methods", envir = prototype)
            })
 
-
 setGeneric("specialNames", def = function(protoObject) standardGeneric("specialNames"),
            useAsDefault = function(protoObject) character())
 
 
-###_ INTERNAL FUNCTIONS
-## Rely only on internal implementation.
-## Always use as.environment (do not rely on [[]], or other user changeable methods)
-## All this funcs start with .
-## Do not rely on  objects methods (like $, methods, etc) (only func programming)
-
+
+###_ ACCESSORS
 create_specialised_accesor <- function(type){
     fun <- eval(substitute(
       function(value){
@@ -137,44 +78,6 @@ create_specialised_accesor <- function(type){
     fun
 }
 
-## SetsClass("protoECall",
-##          representation(formName = "character"),
-##          prototype(formName = "<undefined_protoForm>"),
-##          contains = "call")
-
-## setMethod("initialize", "protoECall",
-##           function(.Object, ...){
-##               .Object <- callNextMethod()
-##               .Object@.Data <-
-##                   substitute(e(formName),
-##                              list(formName = as.name(.Object@formName)))
-##               .Object
-##           })
-
-## removeMethod("initialize", "protoECall")
-isECall <- function(obj){
-    if(is.recursive(obj) && (typeof(obj) != "special"))
-        identical(obj[[1L]], as.name("e"))
-    else
-        FALSE
-}
-
-## .getOrCreateForm <- function(bindName, whereEnv)
-##     if(exists(bindName, envir = get(".forms", envir = whereEnv))){
-##         get(bindName, envir = whereEnv)
-##     }else{
-##         new("protoForm")
-##     }
-
-.replaceDots <- function(names){
-    if(length(dot_here <- grep(".", names, fixed = TRUE))){
-        warning("\".\" was replaced with \"_\" in ",
-                paste(names[dot_here], collapse=", "))
-        names <- gsub(".", "_", names, fixed = TRUE)
-    }
-    names
-}
-###_ + ACCESSES
 .generic_setter <- function(dots, .self, container_name){
     ## selfEnv <- as.environment(.self)
     switch(container_name,
@@ -232,6 +135,52 @@ isECall <- function(obj){
     }
 }
 
+
+
+
+###_ CLASS REPRESENTATIONS:
+## Extension of classRepresentation to store two new slots: defaultContext and
+## classDef. each new protoContext class generates new classDef with it's
+## default context.
+.modifyAs <- function(classDef){
+    .coerce <-  classDef@contains[[1]]@coerce
+    body(.coerce) <- bquote({value <- .(body(.coerce))
+                             assign(".self", value, envir = value)
+                             value})
+    classDef@contains[[1]]@coerce <- .coerce
+    ## have to modify all he replace methods:
+    for(i in seq_along(classDef@contains)){
+        .replace <- classDef@contains[[i]]@replace
+        body(.replace) <- bquote({from <- .(body(.replace))
+                                  assign(".self", from, envir = from)
+                                  from})
+        classDef@contains[[i]]@replace <- .replace
+    }
+    classDef
+}
+
+
+
+###_ UTILS
+
+##' Return TRUE if envProtoObj is a root object
+##'
+##' @param envProtoObj Object from a subclass of envProtoClass
+##' @author Vitalie Spinu
+##' @export
+isRoot <- function(envProtoObj)
+    exists(.rootMetaName, envir = as.environment(envProtoObj), inherits = FALSE)
+
+newRoot <- function(Class, ...){
+    ClassDef <- getClass(Class, where = topenv(parent.frame()))
+    .Object <- .Call(methods:::C_new_object, ClassDef)
+    .Object@.xData <- new.env(TRUE, parent = topenv(parent.frame()))
+    initializeRoot(.Object, ...)
+}
+
+isMirror <- function(obj)
+    exists("._mirror", obj, inherits = F) && get("._mirror", obj)
+
 areIdentical <- function(c1, c2){
     ##  comapre two envProtoObjects
     reserved <- c( ".fields", ".forms", ".homeContext", ".methods", ".prototype", ".self",  ".cells", ".protozize", ".PROTOZIZE", "e")
@@ -256,26 +205,18 @@ areIdentical <- function(c1, c2){
     ##     TRUE
 }
 
-## areIdenticalPBM <- function(pbm1, pbm2){
-##     names1 <- ls(pbm1[[".cells"]], all.names =  T)
-##     names2 <- ls(pbm2[[".cells"]], all.names =  T)
-##     reserved <- character()
-##     if(length(diff1 <- setdiff(setdiff(names1, names2), reserved)))
-##         message("folowing cells are found in pbm1 and  not in pbm2: \n",
-##                 paste(diff1, collapse = ", "))
-##     if(length(diff2 <- setdiff(setdiff(names2, names1), reserved)))
-##         message("folowing cells are found in pbm2 and not in pbm1: \n",
-##                 paste(diff2, collapse = ", "))
-##     if(length(diff1) == 0 && length(diff2) == 0){
-##         diffs <- sapply(names1, function(nm) {
-##             cat(" --> ", nm, "\n")
-##             areIdentical(pbm1[[".cells"]][[nm]], pbm2[[".cells"]][[nm]])
-##         })
-##         diffs
-##     }else{
-##         TRUE
-##     }
-## }
+
+
+###_ INTERNALS
+.rootMetaName <- ".|.root"
+.defaultMetaName <- ".|.defaultContext"
+
+.gen_mirr_name <- function(mname)
+    paste0("_", mname)
+
+.signAsRoot <- function(envProtoObj)
+    assign(.rootMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
+
 
 .complete_partial_name <- function(name, container){
     ## return the full name from the container
@@ -287,25 +228,6 @@ areIdentical <- function(c1, c2){
     else
         match
 }
-
-## fullType <- function(part_type, obj){
-##     if(is(obj, "protoContainer"))
-##         .complete_partial_name(part_type, container)
-##     else if(is(obj, "protoContext"))
-##         .complete_partial_name(part_type, get(".cells", envir = obj))
-##     else
-##         stop("obj must be of class protoContainer or protoContext,  suplied an object of class \"", class(obj), "\"")
-## }
-
-## .existsPartial <- function(name, container){
-##     "TRUE if object with partial name NAME exists in the container"
-##     all_names <- .get_all_names(container)
-##     match <- charmatch(name, all_names)
-##     if(is.na(match)||match == 0L)
-##         FALSE
-##     else
-##         TRUE
-## }
 
 .getPartial <- function(name, container, trigger_error = TRUE, object_name = "object"){
     "Return an object with the partial name 'name' from container.
@@ -326,19 +248,6 @@ Return NULL if trigger_error = FALSE and match not found."
 .removeFromContainer <- function(names, container, where){
     remove(list = names, envir = as.environment(where[[container]]))
 }
-
-## .first_protoObject <- function(envProtoObj, name = "*", container = ".cells"){
-##     ## "Return the first envProtoObject in which \nthe NAME is installed in the CONTAINER "
-##     ## env <- as.environment(envProtoObject)
-##     ## if(exists(name, env[[container]])){
-##     ##     while(!exists(name, env[[container]], inherits = FALSE))
-##     ##         env <-  as.environment(get(".prototype", envir = env))
-##     ##     return(invisible(env))
-##     ## }else{
-##     ##     return(invisible(NULL))
-##     ## }
-## }
-
 
 .PROTOZIZE <- function(fun){
     ## not working, , , tothink:
@@ -402,6 +311,17 @@ Return NULL if trigger_error = FALSE and match not found."
 }
 
 
+
+###_ ONLOAD
+
+.onLoad  <- function(libname, pkgname){
+    where <- environment(sys.function())  # the namespace
+
+    options(protoClasses.changeCallEnv = FALSE,
+            protoClasses.debugMode = TRUE)
+}
+
+
 ## Local Variables:
 ## ess-roxy-template-alist: (
 ##  ("description" . "..description")
@@ -416,17 +336,4 @@ Return NULL if trigger_error = FALSE and match not found."
 ##  ;;("references" . "\\url{https://docs.developer.betfair.com/betfair/}")
 ##  )
 ## end:
-
-## for(nm in c(
-##   "envProtoClass.R",
-##   "protoFields.R",
-##   "protoForms.R",
-##   "protoMethods.R",
-##   "protoCells.R",
-##   "protoContexts.R",
-##   "clone.R",
-##   "debug.R",
-##   "graph.R",
-##   "info.R"))
-##     source(nm)
     

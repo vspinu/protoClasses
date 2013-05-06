@@ -89,35 +89,37 @@ isDefaultContext <- function(envProtoObj)
 .signAsDefaultContext <- function(envProtoObj)
     assign(.defaultMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
 
-setMethod("initialize", signature(.Object = "protoContext"),
-          function(.Object,
-                   prototype = NULL,
-                   initCells = list(),
-                   cells = list(),
-                   rootParentEnv = NULL, ## todo:  make field
-                   ...){
-              ## PROTOTYPE must be a valid envProtoObject (todo: validate!!)
-              if(is.null(prototype)){
-                  prototype <- getClassDef(class(.Object))@defaultContext
-              }
-              .Object <- callNextMethod(.Object, prototype = prototype, ...) # envProtoClass
-              objEnv <- as.environment(.Object)
+evalqOnLoad({
+    setMethod("initialize", signature(.Object = "protoContext"),
+              function(.Object,
+                       prototype = NULL,
+                       initCells = list(),
+                       cells = list(),
+                       rootParentEnv = NULL, ## todo:  make field
+                       ...){
+                  ## PROTOTYPE must be a valid envProtoObject (todo: validate!!)
+                  if(is.null(prototype)){
+                      prototype <- getClassDef(class(.Object))@defaultContext
+                  }
+                  .Object <- callNextMethod(.Object, prototype = prototype, ...) # envProtoClass
+                  objEnv <- as.environment(.Object)
 
-              ## Cells
-              parent.cells <- get(".cells", envir = prototype, inherits = FALSE)
-              objEnv[[".cells"]] <-  new("cellContainer", parentContainer = parent.cells, host = .Object)
-              objEnv[[".self"]] <- .Object
-              objEnv[[".rootCellParentEnv"]] <-
-                  if(is.null(rootParentEnv))
-                      get(".rootCellParentEnv", envir = objEnv[[".prototype"]])
-                  else rootParentEnv
+                  ## Cells
+                  parent.cells <- get(".cells", envir = prototype, inherits = FALSE)
+                  objEnv[[".cells"]] <-  new("cellContainer", parentContainer = parent.cells, host = .Object)
+                  objEnv[[".self"]] <- .Object
+                  objEnv[[".rootCellParentEnv"]] <-
+                      if(is.null(rootParentEnv))
+                          get(".rootCellParentEnv", envir = objEnv[[".prototype"]])
+                      else rootParentEnv
 
-              ## New Cells
-              .initCells(initCells, .Object)
-              if(length(cells))
-                  .generic_setter(cells, .Object, ".cells")
-              .Object
-          })
+                  ## New Cells
+                  .initCells(initCells, .Object)
+                  if(length(cells))
+                      .generic_setter(cells, .Object, ".cells")
+                  .Object
+              })
+})
 
 setMethod("initializeRoot", "protoContext",
           function(.Object, rootParentEnv = globalenv(), ##fixme:  make field:
@@ -216,10 +218,13 @@ setMethod("show", "contextClassRepresentation",
                   no.list = TRUE)
           })
 
-assignClassDef("protoContext",
-               .modifyAs(new("contextClassRepresentation", getClassDef("protoContext") ,
-                             defaultContext = newRoot("protoContext", type = "@", isDefaultContext = TRUE))
-                         ))
 
-## Install the super-root cell in the super - root default context
-getClassDef("protoContext")@defaultContext$initCells(`*` = newRoot("protoCell"))
+evalqOnLoad({
+    assignClassDef("protoContext",
+                   .modifyAs(new("contextClassRepresentation", getClassDef("protoContext") ,
+                                 defaultContext = newRoot("protoContext", type = "@", isDefaultContext = TRUE))
+                             ))
+
+    ## Install the super-root cell in the super - root default context
+    getClassDef("protoContext")@defaultContext$initCells(`*` = newRoot("protoCell"))
+})

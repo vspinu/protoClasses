@@ -236,63 +236,65 @@ setMethod("initialize", signature(.Object = "protoContainer"),
 
 
 ###_ CLASS REPRESENTATION
-assignClassDef("envProtoClass", .modifyAs(getClassDef("envProtoClass")))
-
+evalqOnLoad({
+  assignClassDef("envProtoClass", .modifyAs(getClassDef("envProtoClass")))
+})
 
 
 ###_ INITIALIZE
-setMethod("initialize", signature(.Object = "envProtoClass"),
-          function(.Object,
-                   prototype = newRoot("envProtoClass"), ## tothink: what a heck is this here?
-                   type = "--",
-                   initMethods = list(), initFields = list(), initForms = list(),
-                   setMethods = list(), setFields = list(), setForms = list(),
-                   expr = expression(),
-                   changeCallEnv = getOption("protoClasses")$changeCallEnv, ...){
+evalqOnLoad({
+    setMethod("initialize", signature(.Object = "envProtoClass"),
+              function(.Object,
+                       prototype = newRoot("envProtoClass"), ## tothink: what a heck is this here?
+                       type = "--",
+                       initMethods = list(), initFields = list(), initForms = list(),
+                       setMethods = list(), setFields = list(), setForms = list(),
+                       expr = expression(),
+                       changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE), ...){
 
-              .Object <- callNextMethod()
+                  .Object <- callNextMethod()
 
-              ## !!!!! NO CLONING,  ALWAYS A NEW OBJECT !!!!!!!! ##
-              objEnv <- .Object@.xData <- new.env(TRUE)
+                  ## !!!!! NO CLONING,  ALWAYS A NEW OBJECT !!!!!!!! ##
+                  objEnv <- .Object@.xData <- new.env(TRUE)
 
-              ## BASIC VALIDATION:
-              if(!is(prototype, "envProtoClass")) # tothink: prototype should be from the same class as .Object??
-                  stop("Class of prototype argument must extend \"envProtoClass\".\n Got an object of class \"", class(prototype), "\"")
-              isValidProtoObject(prototype, trigger_error = TRUE)
-              parent.env(objEnv) <-
-                  protoEnv <- as.environment(prototype)
+                  ## BASIC VALIDATION:
+                  if(!is(prototype, "envProtoClass")) # tothink: prototype should be from the same class as .Object??
+                      stop("Class of prototype argument must extend \"envProtoClass\".\n Got an object of class \"", class(prototype), "\"")
+                  isValidProtoObject(prototype, trigger_error = TRUE)
+                  parent.env(objEnv) <-
+                      protoEnv <- as.environment(prototype)
 
 
-              ## SPECIALS
-              .insertSpecial(objEnv, self = .Object, prototype = prototype)
+                  ## SPECIALS
+                  .insertSpecial(objEnv, self = .Object, prototype = prototype)
 
-              ## FUNDAMENTAL CONTAINERS:
-              objEnv[[".fields"]] <- new("fieldContainer",  host = .Object)
-              objEnv[[".methods"]] <-new("methodContainer", host = .Object)
-              objEnv[[".forms"]] <- new("formContainer",  host = .Object)
+                  ## FUNDAMENTAL CONTAINERS:
+                  objEnv[[".fields"]] <- new("fieldContainer",  host = .Object)
+                  objEnv[[".methods"]] <-new("methodContainer", host = .Object)
+                  objEnv[[".forms"]] <- new("formContainer",  host = .Object)
 
-              ## DEFAULTS
-              .setField(.Object, "type", type) # type field was initialized  in the root
-              
-              ## USER supplied INITS
-              if(changeCallEnv){
-                  initFields <- eval(substitute(initFields), envir = objEnv)
-                  initMethods <- eval(substitute(initMethods), envir = objEnv)
-                  initForms <- eval(substitute(initForms), envir = objEnv)
-              }
-              .initFields(initFields, .Object)
-              .initMethods(initMethods, .Object)
-              .initForms(initForms, .Object)
-              if(length(setFields))
-                  .generic_setter(setFields, .Object, ".fields")
-              if(length(setMethods))
-                  .generic_setter(setMethods, .Object, ".methods")
-              if(length(setForms))
-                  .generic_setter(setForms, .Object, ".forms")
-              eval(expr, envir = objEnv)
-              .Object
-          })
-
+                  ## DEFAULTS
+                  .setField(.Object, "type", type) # type field was initialized  in the root
+                  
+                  ## USER supplied INITS
+                  if(changeCallEnv){
+                      initFields <- eval(substitute(initFields), envir = objEnv)
+                      initMethods <- eval(substitute(initMethods), envir = objEnv)
+                      initForms <- eval(substitute(initForms), envir = objEnv)
+                  }
+                  .initFields(initFields, .Object)
+                  .initMethods(initMethods, .Object)
+                  .initForms(initForms, .Object)
+                  if(length(setFields))
+                      .generic_setter(setFields, .Object, ".fields")
+                  if(length(setMethods))
+                      .generic_setter(setMethods, .Object, ".methods")
+                  if(length(setForms))
+                      .generic_setter(setForms, .Object, ".forms")
+                  eval(expr, envir = objEnv)
+                  .Object
+              })
+})
 
 setMethod("initializeRoot", "envProtoClass",
           function(.Object,  ##TODO: !! get the "pure" initialization functionality into separate slot "initialize" in class definition!!
@@ -319,12 +321,18 @@ setMethod("initializeRoot", "envProtoClass",
                                  function(value){
                                      if(missing(value))
                                          .type
-                                     else assign(".type", .replaceDots(as.character(value)), .self)
+                                     else{
+                                         if(grepl(".", value, fixed = TRUE)){
+                                             warning("\".\" was replaced with \"_\" in ", value)
+                                             value <- gsub(".", "_", value, fixed = TRUE)
+                                         }
+                                         assign(".type", value, .self)
+                                     }
                                  }),
                                Type = protoField(
                                  function(value){
                                      if(missing(value))
-                                         .getType(.self)
+                                         protoClasses:::.getType(.self)
                                      else stop("Cannot assign extended type.")
                                  }),
                                proto = protoField(
@@ -341,61 +349,61 @@ setMethod("initializeRoot", "envProtoClass",
 
               ## BASIC METHODS
               .initMethods(list(
-                initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                     dots <-
                         if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
                         else  c(list(...), .list)
-                    .initMethods(dots, .self)
+                    protoClasses:::.initMethods(dots, .self)
                 },
-                setMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                setMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                     dots <-
                         if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
                         else c(list(...), .list)
-                    .generic_setter(dots, .self, ".methods")
+                    protoClasses:::.generic_setter(dots, .self, ".methods")
                 },
-                initFields = function(..., .list = list(), .classes = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv) {
+                initFields = function(..., .list = list(), .classes = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)) {
                     dots <-
                         if(changeCallEnv){
                             .classes <- eval(substitute(.classes), envir = .self)
                             eval(substitute(c(list(...), .list)), envir = .self)
                         }else  c(list(...), .list)
-                    .initFields(dots, .self, .classes)
+                    protoClasses:::.initFields(dots, .self, .classes)
                 },
-                setFields = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                setFields = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                     dots <-
                         if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
                         else c(list(...), .list)
-                    .generic_setter(dots, .self, ".fields")
+                    protoClasses:::.generic_setter(dots, .self, ".fields")
                 },
-                initForms = function(..., .list = list(), after = NULL,  changeCallEnv = getOption("protoClasses")$changeCallEnv) {
+                initForms = function(..., .list = list(), after = NULL,  changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)) {
                     dots <-
                         if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
                         else c(list(...), .list)
-                    .initForms(dots, .self, after = after)
+                    protoClasses:::.initForms(dots, .self, after = after)
                 },
-                setForms = function(..., .list = list(), changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                setForms = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                     dots <-
                         if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
                         else c(list(...), .list)
-                    .generic_setter(dots, .self, ".forms")
+                    protoClasses:::.generic_setter(dots, .self, ".forms")
                 },
-                methods = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                methods = function(..., changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                     dots <-
                         if(changeCallEnv) eval(substitute(list(...)), envir = .self)
                         else  list(...)
-                    .generic_getter(dots, .self, ".methods")
+                    protoClasses:::.generic_getter(dots, .self, ".methods")
                 },
-                fields = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                fields = function(..., changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                     dots <-
                         if(changeCallEnv) eval(substitute(list(...)), envir = .self)
                         else  list(...)
-                    .generic_getter(dots, .self, ".fields")
+                    protoClasses:::.generic_getter(dots, .self, ".fields")
                 },
-                forms = function(..., changeCallEnv = getOption("protoClasses")$changeCallEnv){
+                forms = function(..., changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                     dots <-
                         if(changeCallEnv) eval(substitute(list(...)), envir = .self)
                         else  list(...)
-                    .generic_getter(dots, .self, ".forms")
+                    protoClasses:::.generic_getter(dots, .self, ".forms")
                 },
                 debug = function(..., .methods, .fields, .forms){
                     .debugObjects(list(...), .methods = c(), .fields = c(), .forms = c(), .where = .self)
@@ -407,8 +415,8 @@ setMethod("initializeRoot", "envProtoClass",
                 eval(substitute({browser(skipCalls = 2);browser(skipCalls = 2)}), envir = .self), 
                 expr = function(expr){
                     invisible(eval(substitute(expr), envir = .self))
-                }),
-                           where = objEnv)
+                }),where = objEnv)
+              
               ## "USER" FIELDS:
               .initFields(initFields, .Object)
               .initMethods(initMethods, .Object)

@@ -10,7 +10,8 @@ setClass("protoField",
 
 protoField <- function(func = function(value) NULL ,  doc = "", ...){
     subfunc <- substitute(func)
-    if(protoClasses_debug_mode && is.name(subfunc) && is.function(func))
+    if(getOption("protoClasses.debugMode", FALSE) &&
+       is.name(subfunc) && is.function(func))
         func <- eval(substitute(
           function(value){
               loc_func <- func_name
@@ -50,12 +51,12 @@ setMethod("installBinding", "protoField",
               callNextMethod()
           })
 
-setMethod("$", signature(x = "fieldContainer"),
-          function(x,name){
-              field_fun <- get(name, envir = x)
-              environment(field_fun) <- x@host
-              field_fun()
-          })
+.dollarGet_fieldContainer <- function(x,name){
+    field_fun <- get(name, envir = x)
+    environment(field_fun) <- x@host
+    field_fun()
+}
+setMethod("$", signature(x = "fieldContainer"),.dollarGet_fieldContainer)
 
 .dollarSet_fieldContainer <- function(x, name, value, error = TRUE){
     ## x is a container

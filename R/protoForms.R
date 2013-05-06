@@ -35,6 +35,14 @@ form <- function(..., doc = character()){
     new("protoForm", eval(expr), doc = doc)
 }
 
+## removeMethod("initialize", "protoECall")
+isECall <- function(obj){
+    if(is.recursive(obj) && (typeof(obj) != "special"))
+        identical(obj[[1L]], as.name("e"))
+    else
+        FALSE
+}
+
 .F <- function(expr, doc = character()){
     ## force evaluation of encapsulated expressions F.(...), form(), as.forms in
     ## order to generate subexpressions that are actually forms and not just
@@ -190,85 +198,86 @@ setClass("protoFormDefinition",
          representation(formClass = "character"),
          prototype(formClass = "protoForm")) # add host protoObject?
 
-setMethod("installBinding", "protoForm",
-          function(bindDefinition, container, bindName,
-                   after = NULL, returnBinding = bindName,
-                   reinstal = FALSE){
-              ## * Used recursively:
-              ## if bindDefinition is a form - assign in the whereEnv and return e(...)
-              ## if bindDefinition is an expression - just return (as it is called recursively)
-              ## * main idea: an assigned form should have only calls like e(aa.bb.cc) or
-              ## simple expressions. No forms as children.
-              ## * If the form's name is like aa.bb.cc ,check for existence of aa.bb and aa
-              ## and install the eform e(aa.bb.cc) into aa.bb with the name "cc" and
-              ## e(aa.bb) into "aa" with the name "bb".
-              ## * If bindDefinition == NULL then this form ("aa.bb") and all the children forms
-              ## ("aa.bb.cc.dd" etc) are removed from CONTAINER
-              ## * if AFTER is nonnull it must be character or an integer specifying
-              ## the position of the new form "cc" in the parent form "aa.bb"
+.installBinding_protoForm <- function(bindDefinition, container, bindName,
+                                      after = NULL, returnBinding = bindName,
+                                      reinstal = FALSE){
+    ## * Used recursively:
+    ## if bindDefinition is a form - assign in the whereEnv and return e(...)
+    ## if bindDefinition is an expression - just return (as it is called recursively)
+    ## * main idea: an assigned form should have only calls like e(aa.bb.cc) or
+    ## simple expressions. No forms as children.
+    ## * If the form's name is like aa.bb.cc ,check for existence of aa.bb and aa
+    ## and install the eform e(aa.bb.cc) into aa.bb with the name "cc" and
+    ## e(aa.bb) into "aa" with the name "bb".
+    ## * If bindDefinition == NULL then this form ("aa.bb") and all the children forms
+    ## ("aa.bb.cc.dd" etc) are removed from CONTAINER
+    ## * if AFTER is nonnull it must be character or an integer specifying
+    ## the position of the new form "cc" in the parent form "aa.bb"
 
-              whereEnv <- as.environment(container@host)
-              form <- bindDefinition
+    whereEnv <- as.environment(container@host)
+    form <- bindDefinition
 
-              ## bindName is aa.bb.cc
-              rec_names <- unlist(strsplit(bindName, split = ".",  ## "aa" "bb" "cc"
-                                           fixed = TRUE), use.names=FALSE)
-              cum_names <- Reduce(function(x, y) ## "aa.bb.cc" "aa.bb"    "aa"
-                                  c(paste(x[[1]], y, sep = "."), x), rec_names)
-              if(is.null(form))
-                  return(.removeFormWithChildren(bindName, whereEnv))
+    ## bindName is aa.bb.cc
+    rec_names <- unlist(strsplit(bindName, split = ".",  ## "aa" "bb" "cc"
+                                 fixed = TRUE), use.names=FALSE)
+    cum_names <- Reduce(function(x, y) ## "aa.bb.cc" "aa.bb"    "aa"
+                        c(paste(x[[1]], y, sep = "."), x), rec_names)
+    if(is.null(form))
+        return(.removeFormWithChildren(bindName, whereEnv))
 
-              if(is(form, "protoForm")){
-                  ## create parent forms (i.e. aa.bb, aa) if needed:
-                  assigned <- TRUE
-                  last_assigned <- bindName
-                  while(assigned && length(cum_names) > 1L){
-                      assigned <-
-                          .assignSubForms(cum_names[[2]], ## aa.bb = form(cc = e(aa.bb.cc))
-                                          .makeEForm(cum_names[[1]]), whereEnv, after = after)
-                      last_assigned <- cum_names[[1L]]
-                      cum_names <- cum_names[-1L]
-                  }
-                  ## print(last_assigned)
-                  shortNames <- names(form) ## (dd, ff)
-                  firstNames <- gsub("\\..*", "", shortNames)
-                  longNames <- paste(bindName, shortNames, sep = ".") ## (aa.bb.cc.dd, aa.bb.cc.ff)
-                  newForm <-
-                      if(!reinstal && exists(bindName, envir = whereEnv[[".forms"]]))
-                          get(bindName, envir = whereEnv)
-                      else new("protoForm")
-                  stopifnot(is(newForm, "protoForm"))
-                  for(i in seq_along(firstNames)){
-                      if(!is.null(newForm[[firstNames[[i]]]]))
-                          stop.pbm("subexpression `", firstNames[[i]], "` in form `", bindName,
-                                   "` is already initialised. Use 'removeForm' first, or 'setForms' instead", env = whereEnv)
-                  }
-                  for(i in seq_along(firstNames)){
-                      newForm[[firstNames[[i]]]] <-
-                          ## if a form then install, if expression, just return
-                          .installBinding_protoForm(
-                            form[[i]], container, longNames[[i]],
-                            returnBinding = paste(bindName, firstNames[[i]], sep = "."))
-                  }
+    if(is(form, "protoForm")){
+        ## create parent forms (i.e. aa.bb, aa) if needed:
+        assigned <- TRUE
+        last_assigned <- bindName
+        while(assigned && length(cum_names) > 1L){
+            assigned <-
+                .assignSubForms(cum_names[[2]], ## aa.bb = form(cc = e(aa.bb.cc))
+                                .makeEForm(cum_names[[1]]), whereEnv, after = after)
+            last_assigned <- cum_names[[1L]]
+            cum_names <- cum_names[-1L]
+        }
+        ## print(last_assigned)
+        shortNames <- names(form) ## (dd, ff)
+        firstNames <- gsub("\\..*", "", shortNames)
+        longNames <- paste(bindName, shortNames, sep = ".") ## (aa.bb.cc.dd, aa.bb.cc.ff)
+        newForm <-
+            if(!reinstal && exists(bindName, envir = whereEnv[[".forms"]]))
+                get(bindName, envir = whereEnv)
+            else new("protoForm")
+        stopifnot(is(newForm, "protoForm"))
+        for(i in seq_along(firstNames)){
+            if(!is.null(newForm[[firstNames[[i]]]]))
+                stop.pbm("subexpression `", firstNames[[i]], "` in form `", bindName,
+                         "` is already initialised. Use 'removeForm' first, or 'setForms' instead", env = whereEnv)
+        }
+        for(i in seq_along(firstNames)){
+            newForm[[firstNames[[i]]]] <-
+                ## if a form then install, if expression, just return
+                .installBinding_protoForm(
+                  form[[i]], container, longNames[[i]],
+                  returnBinding = paste(bindName, firstNames[[i]], sep = "."))
+        }
                                         # -------------------------------------------------------------- #
                                         # install newForm only if different                              #
                                         # if(exists(bindName, envir = get(".forms", envir = whereEnv))){ #
                                         #     oldForm <- get(bindName, envir = whereEnv)                 #
                                         # if(!identical(newForm, oldForm)){                              #
                                         # -------------------------------------------------------------- #
-                  ## todo: get the followining into unit test somehow
-                  if(exists(bindName, whereEnv) && 
-                     (ln <- length(setdiff(names(get(bindName, whereEnv)), names(newForm)))))
-                      warn.pbm("warning: ", ln, " subforms removed in '", bindName, "' form", env = whereEnv)
-                  assign(bindName, newForm, envir = whereEnv)
-                  .installBinding_default(new("protoFormDefinition", formClass = class(form)),
-                                          container, bindName, ".forms")
-                  return(.makeEexpr(returnBinding))
-              }else{
-                  ## .assignForm should no be used directly to assign non protoForm objects !!
-                  return(form)  ## returns as is (i.e. expression), nothing is assigned
-              }
-          })
+        ## todo: get the followining into unit test somehow
+        if(exists(bindName, whereEnv) && 
+           (ln <- length(setdiff(names(get(bindName, whereEnv)), names(newForm)))))
+            warn.pbm("warning: ", ln, " subforms removed in '", bindName, "' form", env = whereEnv)
+        assign(bindName, newForm, envir = whereEnv)
+        .installBinding_default(new("protoFormDefinition", formClass = class(form)),
+                                container, bindName, ".forms")
+        return(.makeEexpr(returnBinding))
+    }else{
+        ## .assignForm should no be used directly to assign non protoForm objects !!
+        return(form)  ## returns as is (i.e. expression), nothing is assigned
+    }
+}
+
+setMethod("installBinding", "protoForm", .installBinding_protoForm)
 
 .makeEexpr <- function(formName)
     substitute(e(formName), list(formName = as.name(formName)))
@@ -458,7 +467,9 @@ setMethod("initialize", "protoForm",
     whereEnv <- as.environment(where)
     ## tothink: do I really need emptyforms?
     if(length(emptyforms) > 0L){
-        forms <- c(forms, setNames(as.list(rep(expression(), length(emptyforms))), as.character(emptyforms)))
+        forms <- c(forms, setNames(as.list(rep(expression(),
+                                               length(emptyforms))),
+                                   as.character(emptyforms)))
     }
     if(!is.null(after))
         forms <- rev(forms)

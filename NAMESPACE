@@ -1,7 +1,7 @@
 exportPattern("^[[:alpha:]]+")
 exportClassPattern("^[[:alpha:]]+")
 importFrom("graphics", plot)
-
+export(.F, .getType)
 exportMethods(
     "$",
     "$<-",

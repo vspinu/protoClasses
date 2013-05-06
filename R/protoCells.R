@@ -227,9 +227,11 @@ setClass("cellClassRepresentation",
          ## really need it?
          prototype = list(contextClass = "protoContext"),
          contains = "classRepresentation")
-assignClassDef("protoCell",
-               .modifyAs(new("cellClassRepresentation", getClassDef("protoCell"))))
 
+evalqOnLoad({
+    assignClassDef("protoCell",
+                   .modifyAs(new("cellClassRepresentation", getClassDef("protoCell"))))
+})
 
 ##' Create a class definition of a cell.
 ##'
@@ -267,53 +269,54 @@ setCellClass <- function(Class,
 
 
 ###_ INITIALIZE
-setMethod("initialize", signature(.Object = "protoCell"),
-          function(.Object,
-                   prototype = "*",
-                   type = "--",
-                   homeContext = NULL,
-                   ## setFoo and initFoo are doen in envProtoClass next method
-                   ...){
-              ## PROTOTYPE can be a character string or a valid envProtoObject
-              ## CELL is *NOT* installed in the context (it's the task of initCell interface)
-              ## Cannot create the root cell!! supplying * as TYPE produces the cell *.*
- 
-              ## CONTEXT
-              context <-
-                  if(is.null(homeContext))
-                      ##default context
-                      getClassDef(getClassDef(class(.Object))@contextClass)@defaultContext
-                  else as.environment(homeContext)[[".self"]]
+evalqOnLoad({
+    setMethod("initialize", signature(.Object = "protoCell"),
+              function(.Object,
+                       prototype = "*",
+                       type = "--",
+                       homeContext = NULL,
+                       ## setFoo and initFoo are doen in envProtoClass next method
+                       ...){
+                  ## PROTOTYPE can be a character string or a valid envProtoObject
+                  ## CELL is *NOT* installed in the context (it's the task of initCell interface)
+                  ## Cannot create the root cell!! supplying * as TYPE produces the cell *.*
+                  
+                  ## CONTEXT
+                  context <-
+                      if(is.null(homeContext))
+                          ##default context
+                          getClassDef(getClassDef(class(.Object))@contextClass)@defaultContext
+                      else as.environment(homeContext)[[".self"]]
 
-              isValidProtoObject(context, trigger_error = TRUE, object_name = "context")
-              ## if homeContext = NULL next check is superfluous
-              if(!is(context, tCls <- getClassDef(class(.Object))@contextClass))
-                  stop(gettextf("Attempt to create an object of class %s in a homeContext of class %s
+                  isValidProtoObject(context, trigger_error = TRUE, object_name = "context")
+                  ## if homeContext = NULL next check is superfluous
+                  if(!is(context, tCls <- getClassDef(class(.Object))@contextClass))
+                      stop(gettextf("Attempt to create an object of class %s in a homeContext of class %s
 that doesn't extend cell's default context class %s",
-                                class(.Object), class(homeContext), tCls))
+                                    class(.Object), class(homeContext), tCls))
 
-              
-              ## PROTOTYPE
-              .cells <- as.environment(get(".cells", context))
-              if(is.character(prototype)){
-                  prototype <- .getPartial(prototype, container = .cells,
-                                           trigger_error = TRUE, object_name = "prototype")
-              }
+                  
+                  ## PROTOTYPE
+                  .cells <- as.environment(get(".cells", context))
+                  if(is.character(prototype)){
+                      prototype <- .getPartial(prototype, container = .cells,
+                                               trigger_error = TRUE, object_name = "prototype")
+                  }
 
-              isValidProtoObject(prototype, trigger_error = TRUE, object_name = "prototype")
-              
-              type <- as.character(type)
+                  isValidProtoObject(prototype, trigger_error = TRUE, object_name = "prototype")
+                  
+                  type <- as.character(type)
 
-              ## CREATE THE CELL
-              .Object <- callNextMethod(.Object, type = type, prototype = prototype,  ...)
+                  ## CREATE THE CELL
+                  .Object <- callNextMethod(.Object, type = type, prototype = prototype,  ...)
 
-              ## Special OBJECTS:
-              objEnv <- as.environment(.Object)
-              objEnv[[".homeContext"]] <- homeContext
-              objEnv[[".self"]] <- .Object
+                  ## Special OBJECTS:
+                  objEnv <- as.environment(.Object)
+                  objEnv[[".homeContext"]] <- homeContext
+                  objEnv[[".self"]] <- .Object
 
-              .Object
-          })
+                  .Object
+              })})
 
 .initCells <- function(cells, where){
     "Install CELLS in the object WHERE"
