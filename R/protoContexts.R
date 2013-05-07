@@ -86,9 +86,6 @@ isDefaultContext <- function(envProtoObj)
 
 
 ###_ INITIALIZE
-.signAsDefaultContext <- function(envProtoObj)
-    assign(.defaultMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
-
 evalqOnLoad({
     setMethod("initialize", signature(.Object = "protoContext"),
               function(.Object,
@@ -152,6 +149,8 @@ setMethod("initializeRoot", "protoContext",
 
 
 ###_ CLASS REPRESENTATION
+.signAsDefaultContext <- function(envProtoObj)
+    assign(.defaultMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
 
 ##' Create a class definition for a proto context.
 ##'
@@ -174,27 +173,36 @@ setMethod("initializeRoot", "protoContext",
 ##' @export
 ##'
 setContextClass <- function(Class,
-                            defaultContext = new("protoContext", type = paste(Class, "@",  sep = "")), ## not root by default
                             cellClass = "protoCell",
-                            contains = character(),
+                            contains = "protoContext",
                             where = topenv(parent.frame()),
                             ...){
+
+    which_pc <- sapply(contains, extends, "protoContext")
     ## temporarily assign an ordinary class definition
-    if(!any(unlist(sapply(contains, extends, "protoContext"))))
-        contains <- unique(c(contains, "protoContext"))
-    setClass(Class, contains = contains,
-             where = where, ...)
+    if(any(which_pc))
+        cls <- contains[[which_pc]][[1]]
+    else
+        stop("none of the classes in 'contains' argument inherit from 'protoContext' class")
+
+    defaultContext <- new(cls, type = paste(Class, "@",  sep = ""),
+                          prototype = getClassDef(cls)@defaultContext)
+    .signAsDefaultContext(defaultContext)
+
+    setClass(Class, contains = contains, where = where, ...)
     ## generate contextClassRepresentation definition
     classDef <- new("contextClassRepresentation",
                     getClassDef(Class, where = where),
                     defaultContext = defaultContext,
                     cellClass = cellClass)
+    
     classDef <- .modifyAs(classDef)
-    ## assign the new definition
     assignClassDef(Class, classDef, where, force = force)
-    classDef@defaultContext <- as(defaultContext, Class) ## default context should be also of class "Class"
+    
+    ## default context should be also of class "Class"
+    classDef@defaultContext <- as(defaultContext, Class)
     assignClassDef(Class, classDef, where, force = force)
-    .signAsDefaultContext(defaultContext)
+    
     Class
 }
 
