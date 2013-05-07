@@ -1,4 +1,4 @@
-context("Contexts")
+context("protoContexts")
 
 X <- protoContext("X")
 Y <- protoContext("Y", X)
