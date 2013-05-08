@@ -1,4 +1,4 @@
-context("protoContexts")
+context("Contexts")
 
 default <- getClassDef("protoContext")@defaultContext
 X <- protoContext("X")

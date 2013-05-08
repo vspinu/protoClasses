@@ -87,9 +87,9 @@ test_that("Complex fields work:", {
 
 test_that("Virtual (ANY) classes behave as expected",{
     Y$initFields(.list = list(ccc = 34L, ddd = 34),
-                 .classes=c(any2 = "ANY", string = "character"))
+                 .classes=c(any = "ANY", string = "character"))
     expect_identical(Y$string, character())
-    expect_error(Y$any) # not initialized for ANY
+    expect_identical(Y$any, any) # not initialized for ANY, so get's the object any :)
     Y$string <- 232
     expect_equal(Y$string, "232")
     Y$any <- 232

@@ -1,4 +1,4 @@
-context("classes")
+context("Classes")
 
 context_def <- getClassDef("protoContext")
 cell_def <- getClassDef("protoCell")

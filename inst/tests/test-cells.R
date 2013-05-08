@@ -1,4 +1,4 @@
-context("protoCells")
+context("Cells")
 
 defaultContainer <- getClassDef("protoContext")@defaultContext
 default <- defaultContainer[[".cells"]][["*"]]
@@ -30,7 +30,7 @@ test_that("context inherit correctly", {
     expect_identical(as.environment(y$proto), as.environment(x))
     expect_identical(as.environment(z$proto), as.environment(y))
     ## this one fails if code was sourced in global env
-    expect_identical(parent.env(default), getNamespace("protoClasses"))
+    expect_identical(parent.env(default), globalenv())
 })
 
 test_that("containers preserve inheritance", {
