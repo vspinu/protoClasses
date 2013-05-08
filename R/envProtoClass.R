@@ -152,10 +152,6 @@ setMethod("$", signature(x = "envProtoClass"),
 ##' @rdname dollar
 setMethod("$<-", signature(x = "envProtoClass"),
           function(x, name, value){
-              ## if(exists("._setter_redirect_to_", x, inherits = F)){
-              ##     .dollarSet_envProtoClass(get("._setter_redirect_to_", x), name, value)
-              ##     invisible(x)
-              ## }else{
               out <- .setMethod(x, name, value, error=FALSE)
               if(missing(out)){
                   out <- .setField(x, name, value, error = FALSE)
@@ -178,7 +174,6 @@ setClass("protoContainer",
 setMethod("$", signature(x = "protoContainer"),
           definition = function(x, name) get(name, envir = x))
 
-
 setMethod("show", signature(object = "protoContainer"),
           function(object){
               ## callNextMethod()
@@ -186,6 +181,20 @@ setMethod("show", signature(object = "protoContainer"),
               methods:::.printNames("Contains: ", .get_all_names(object))
           })
 
+setMethod("names",
+          signature(x = "protoContainer"),
+          function (x) {
+              .get_all_names(x)
+          })
+
+
+## setMethod("length",
+##           signature(x = "protoContainer"),
+##           function (x) {
+##               length(.get_all_names(x))
+##           })
+
+          
 .get_all_names <- function(container){
     "Search recursively for names in 'container', returns all names."
     containerEnv <- as.environment(container)
@@ -198,7 +207,6 @@ setMethod("show", signature(object = "protoContainer"),
     all_names <- unique(all_names)
     all_names[!(all_names %in% exclude)]
 }
-
 
 .get_all_names_with_host <- function(container){
     "Search recursively for names in 'container', return a list of the form
@@ -236,13 +244,11 @@ setMethod("initialize", signature(.Object = "protoContainer"),
 
 
 ###_ CLASS REPRESENTATION
-evalqOnLoad({
-  assignClassDef("envProtoClass", .modifyAs(getClassDef("envProtoClass")))
-})
+..eloadE0 <- expression(assignClassDef("envProtoClass", .modifyAs(getClassDef("envProtoClass"))))
 
 
 ###_ INITIALIZE
-evalqOnLoad({
+..eloadE1 <- expression({
     setMethod("initialize", signature(.Object = "envProtoClass"),
               function(.Object,
                        prototype = newRoot("envProtoClass"), ## tothink: what a heck is this here?
@@ -270,7 +276,7 @@ evalqOnLoad({
 
                   ## FUNDAMENTAL CONTAINERS:
                   objEnv[[".fields"]] <- new("fieldContainer",  host = .Object)
-                  objEnv[[".methods"]] <-new("methodContainer", host = .Object)
+                  objEnv[[".methods"]] <- new("methodContainer", host = .Object)
                   objEnv[[".forms"]] <- new("formContainer",  host = .Object)
 
                   ## DEFAULTS
@@ -295,6 +301,7 @@ evalqOnLoad({
                   .Object
               })
 })
+
 
 setMethod("initializeRoot", "envProtoClass",
           function(.Object,  ##TODO: !! get the "pure" initialization functionality into separate slot "initialize" in class definition!!
@@ -340,15 +347,27 @@ setMethod("initializeRoot", "envProtoClass",
                                      if(missing(value))
                                          .prototype
                                      else stop("Cannot reasign prototype.")
-                                 }), 
-                               M = protoField(create_specialised_accesor(".methods")),
-                               F = protoField(create_specialised_accesor(".fields")),
-                               H = protoField(create_specialised_accesor(".forms"))),
+                                 }),
+                               methods = protoContainerField(".methods"),
+                               fields = protoContainerField(".fields"), 
+                               forms = protoContainerField(".forms")), 
                           where = objEnv)
+              
               .setField(objEnv, "type", type)
 
               ## BASIC METHODS
               .initMethods(list(
+                new =
+                function(type = "--", initMethods = list(),
+                         initFields = list(), initForms = list(),
+                         setMethods = list(), setFields = list(), setForms = list(),
+                         expr = expression()){
+                    new(class(.self), type = type, prototype = .self,
+                        initMethods = initMethods, setMethods = setMethods,
+                        initFields = initFields, setFields = setFields,
+                        initForms = initForms, setForms = setForms,
+                        expr = expr)
+                }, 
                 initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                     dots <-
                         if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
@@ -387,24 +406,6 @@ setMethod("initializeRoot", "envProtoClass",
                         else c(list(...), .list)
                     protoClasses:::.generic_setter(dots, .self, ".forms")
                 },
-                methods = function(..., changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
-                    dots <-
-                        if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                        else  list(...)
-                    protoClasses:::.generic_getter(dots, .self, ".methods")
-                },
-                fields = function(..., changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
-                    dots <-
-                        if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                        else  list(...)
-                    protoClasses:::.generic_getter(dots, .self, ".fields")
-                },
-                forms = function(..., changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
-                    dots <-
-                        if(changeCallEnv) eval(substitute(list(...)), envir = .self)
-                        else  list(...)
-                    protoClasses:::.generic_getter(dots, .self, ".forms")
-                },
                 debug = function(..., .methods, .fields, .forms){
                     .debugObjects(list(...), .methods = c(), .fields = c(), .forms = c(), .where = .self)
                 }, 
@@ -423,3 +424,8 @@ setMethod("initializeRoot", "envProtoClass",
               .initForms(initForms, .Object)
               .Object
           })
+
+eval(..eloadE0)
+eval(..eloadE1)
+evalOnLoad(..eloadE0)
+evalOnLoad(..eloadE1)

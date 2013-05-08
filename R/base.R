@@ -57,26 +57,28 @@ setGeneric("setPrototype",
                parent.env(.methods) <- get(".methods", envir = prototype)
            })
 
+
+## these names are excluded on clonning
 setGeneric("specialNames", def = function(protoObject) standardGeneric("specialNames"),
            useAsDefault = function(protoObject) character())
 
 
 
 ###_ ACCESSORS
-create_specialised_accesor <- function(type){
-    fun <- eval(substitute(
-      function(value){
-          if(missing(value))
-              container_name
-          else{
-              if(!is(value, "environment") ||
-                 !identical(as.environment(container_name), as.environment(value)))
-                  warning("Oops, trying to assing non-native container. Are you messing with internals through user interface?")
-          }
-      }, list(container_name = as.name(type))))
-    attributes(fun) <- NULL
-    fun
-}
+## create_specialised_accesor <- function(type){
+##     fun <- eval(substitute(
+##       function(value){
+##           if(missing(value))
+##               container_name
+##           else{
+##               if(!is(value, "environment") ||
+##                  !identical(as.environment(container_name), as.environment(value)))
+##                   warning("Oops, trying to assing non-native container. Are you messing with internals through user interface?")
+##           }
+##       }, list(container_name = as.name(type))))
+##     attributes(fun) <- NULL
+##     fun
+## }
 
 .generic_setter <- function(dots, .self, container_name){
     ## selfEnv <- as.environment(.self)
@@ -134,7 +136,6 @@ create_specialised_accesor <- function(type){
         setNames(.extract(names, selfEnv), names = names)
     }
 }
-
 
 
 
@@ -322,6 +323,8 @@ Return NULL if trigger_error = FALSE and match not found."
 }
 
 
+
+
 ## Local Variables:
 ## ess-roxy-template-alist: (
 ##  ("description" . "..description")
@@ -337,3 +340,16 @@ Return NULL if trigger_error = FALSE and match not found."
 ##  )
 ## end:
     
+
+## for(nm in c(
+##             "envProtoClass.R", 
+##             "protoFields.R", 
+##             "protoForms.R", 
+##             "protoMethods.R", 
+##             "protoCells.R", 
+##             "protoContexts.R", 
+##             "clone.R", 
+##             "debug.R", 
+##             "graph.R", 
+##             "info.R"))
+##     source(nm)

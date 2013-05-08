@@ -9,28 +9,53 @@ setClass("protoField",
          contains = "protoFunction")
 
 protoField <- function(func = function(value) NULL ,  doc = "", ...){
-    subfunc <- substitute(func)
-    if(getOption("protoClasses.debugMode", FALSE) &&
-       is.name(subfunc) && is.function(func))
-        func <- eval(substitute(
-          function(value){
-              loc_func <- func_name
-              environment(loc_func) <- .self
-              loc_func(value)
-          }, list(func_name = subfunc)))
+    ## if string
+    if(is.character(func)){ 
+        func <- eval(substitute(function(value){
+            if(missing(value)) get(nm, .self)
+            else assign(nm, value, .self)
+        }, list(nm = func)))
+    } else {
+        ## if function
+        subfunc <- substitute(func)
+        if(getOption("protoClasses.debugMode", FALSE) &&
+           is.name(subfunc) && is.function(func))
+            func <- eval(substitute(
+              function(value){
+                  loc_func <- func_name
+                  environment(loc_func) <- .self
+                  loc_func(value)
+              }, list(func_name = subfunc)))
+    }
     new("protoField", func, doc = doc, ...)
 }
 
-protoReadOnlyField <- function(object_name)
+protoReadOnlyField <- function(object_name, replace_leading_dot = TRUE)
     protoField(eval(substitute(
       function(obj){
           if(missing(obj)){
               get(obj_name, .self)
           }else{
+              if(rep)
+                  obj_name <- sub("^\\.", "", obj_name)
               stop("field '", obj_name, "' is readonly")
           }
-      }, list(obj_name = object_name))))
+      }, list(obj_name = object_name, rep = replace_leading_dot))))
 
+protoContainerField <- function(container_name){
+    protoField(eval(substitute(
+      function(obj){
+          if(missing(obj)){
+              get(container_name, .self)
+          }else{
+              if(!is(obj, "protoContainer"))
+                  stop("assigned value should be a container (", container_name, ")")
+              if(!identical(as.environment(obj@host), as.environment(.self)))
+                  stop("invalid host of the container, (probably a bug, please report)")
+              assign(container_name, obj, .self)
+          }
+      })))
+}
 
 
 ###_ CONTAINER

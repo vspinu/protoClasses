@@ -36,20 +36,20 @@ setMethod("initializeRoot", "protoCell",
 ##' @author Vitalie Spinu
 ##' @export
 protoCell <- function(type = "--",
-                      prototype = "*",
-                      fields = list(),
-                      methods = list(),
-                      forms = list(),
+                      prototype = "*", 
                       initFields = list(),
                       initMethods = list(),
                       initForms = list(),
+                      setFields = list(),
+                      setMethods = list(),
+                      setForms = list(),
                       expr = expression(),
                       rootParentEnv = NULL, ## todo:  make field
                       ...)
     new("protoCell", type = type, prototype = prototype,
-        initMethods = initMethods, methods = methods,
-        initFields = initFields, fields = fields,
-        initForms = initForms, forms = forms,
+        initMethods = initMethods, setMethods = setMethods,
+        initFields = initFields, setFields = setFields,
+        initForms = initForms, setForms = setForms,
         expr = expr, ...)
 
 setMethod("installBinding", "protoCell",
@@ -228,10 +228,9 @@ setClass("cellClassRepresentation",
          prototype = list(contextClass = "protoContext"),
          contains = "classRepresentation")
 
-evalqOnLoad({
+..eloadcl0 <- expression(
     assignClassDef("protoCell",
-                   .modifyAs(new("cellClassRepresentation", getClassDef("protoCell"))))
-})
+                   .modifyAs(new("cellClassRepresentation", getClassDef("protoCell")))))
 
 ##' Create a class definition of a cell.
 ##'
@@ -269,11 +268,11 @@ setCellClass <- function(Class,
 
 
 ###_ INITIALIZE
-evalqOnLoad({
+..eloadcl1 <- expression({
     setMethod("initialize", signature(.Object = "protoCell"),
               function(.Object,
-                       prototype = "*",
                        type = "--",
+                       prototype = "*",
                        homeContext = NULL,
                        ## setFoo and initFoo are doen in envProtoClass next method
                        ...){
@@ -283,22 +282,22 @@ evalqOnLoad({
                   
                   ## CONTEXT
                   context <-
-                      if(is.null(homeContext))
-                          ##default context
+                      if(is.null(homeContext)) 
                           getClassDef(getClassDef(class(.Object))@contextClass)@defaultContext
-                      else as.environment(homeContext)[[".self"]]
+                      else get(".self", homeContext)
 
                   isValidProtoObject(context, trigger_error = TRUE, object_name = "context")
-                  ## if homeContext = NULL next check is superfluous
+
+                  ## if homeContext == NULL, next check is superfluous
                   if(!is(context, tCls <- getClassDef(class(.Object))@contextClass))
                       stop(gettextf("Attempt to create an object of class %s in a homeContext of class %s
-that doesn't extend cell's default context class %s",
-                                    class(.Object), class(homeContext), tCls))
+that doesn't extend cell's default context class %s", class(.Object), class(homeContext), tCls))
 
                   
                   ## PROTOTYPE
                   .cells <- as.environment(get(".cells", context))
                   if(is.character(prototype)){
+                      ## prototype is taken from the default context
                       prototype <- .getPartial(prototype, container = .cells,
                                                trigger_error = TRUE, object_name = "prototype")
                   }
@@ -357,3 +356,14 @@ that doesn't extend cell's default context class %s",
     }
     invisible(cellTypes)
 }
+
+
+eval(..eloadcl0)
+eval(..eloadcl1)
+evalOnLoad(..eloadcl0)
+evalOnLoad(..eloadcl1)
+
+
+
+
+

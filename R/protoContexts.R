@@ -14,22 +14,22 @@ setClass("protoContext", contains = "envProtoClass")
 ##' @author Vitalie Spinu
 protoContext <- function(type = "--",
                          prototype = NULL,
-                         fields = list(),
-                         methods = list(),
-                         forms = list(),
-                         cells = list(),
                          initFields = list(),
                          initMethods = list(),
                          initForms = list(),
                          initCells = list(),
+                         setFields = list(),
+                         setMethods = list(),
+                         setForms = list(),
+                         setCells = list(),
                          expr = expression(),
                          rootParentEnv = NULL, ## todo:  make field
                          ...){
     new("protoContext", type = type, prototype = prototype,
-        initCells = initCells, cells = cells,
-        initMethods = initMethods, methods = methods,
-        initFields = initFields, fields = fields,
-        initForms = initForms, forms = forms,
+        initCells = initCells, setCells = setCells,
+        initMethods = initMethods, setMethods = setMethods,
+        initFields = initFields, setFields = setFields,
+        initForms = initForms, setForms = setForms,
         expr = expr, ...)}
 
 setMethod("show", signature(object = "protoContext"),
@@ -64,7 +64,7 @@ setMethod("$<-", signature(x = "protoContext"),
               if(is(value, "protoCell") && !(is.na(match) || match == 0L)){
                   assign(match, value, envir = .cells)
               }else{
-                  .dollarSet_envProtoClass(x, name, value)
+                  callNextMethod(x, name, value)
               }
               invisible(x)
           })
@@ -86,12 +86,12 @@ isDefaultContext <- function(envProtoObj)
 
 
 ###_ INITIALIZE
-evalqOnLoad({
+..eloadco0 <- expression({
     setMethod("initialize", signature(.Object = "protoContext"),
               function(.Object,
                        prototype = NULL,
                        initCells = list(),
-                       cells = list(),
+                       setCells = list(),
                        rootParentEnv = NULL, ## todo:  make field
                        ...){
                   ## PROTOTYPE must be a valid envProtoObject (todo: validate!!)
@@ -104,6 +104,7 @@ evalqOnLoad({
                   ## Cells
                   parent.cells <- get(".cells", envir = prototype, inherits = FALSE)
                   objEnv[[".cells"]] <-  new("cellContainer", parentContainer = parent.cells, host = .Object)
+
                   objEnv[[".self"]] <- .Object
                   objEnv[[".rootCellParentEnv"]] <-
                       if(is.null(rootParentEnv))
@@ -112,19 +113,19 @@ evalqOnLoad({
 
                   ## New Cells
                   .initCells(initCells, .Object)
-                  if(length(cells))
-                      .generic_setter(cells, .Object, ".cells")
+                  if(length(setCells))
+                      .generic_setter(setCells, .Object, ".cells")
                   .Object
               })
 })
+evalOnLoad(..eloadco0)
 
 setMethod("initializeRoot", "protoContext",
-          function(.Object, rootParentEnv = globalenv(), ##fixme:  make field:
+          function(.Object,
                    initCells = list(), ...){
               .Object <- callNextMethod(.Object, ...) ##envProtoClass
               objEnv <- as.environment(.Object)
               objEnv[[".cells"]] <-  new("cellContainer", host = .Object) ## empty parent by default
-              objEnv[[".rootCellParentEnv"]] <- rootParentEnv # parent of the .rootCell
               .initMethods(list(initCells =
                                 function(...){
                                     dotsq <- substitute(list(...))
@@ -137,12 +138,14 @@ setMethod("initializeRoot", "protoContext",
                                             dots[[i]] <- .setType(dots[[i]], as.character(dotsq[[i + 1L]]))
                                     }
                                     .initCells(dots, .self)
-                                },
-                                cells = function(...){
-                                    selfEnv <- as.environment(.self)
-                                    .generic_setter(list(...), selfEnv, ".cells")
                                 }),
                            where = objEnv)
+              
+              .initFields(list(cells = protoContainerField(".cells"),
+                               rootCellParentEnv = protoField(".rootCellParentEnv")), 
+                          where = objEnv)
+              objEnv[[".rootCellParentEnv"]] <- globalenv() # parent of the .rootCell
+
               .Object
           })
 
@@ -227,12 +230,16 @@ setMethod("show", "contextClassRepresentation",
           })
 
 
-evalqOnLoad({
+..eloadco1 <- expression({
     assignClassDef("protoContext",
                    .modifyAs(new("contextClassRepresentation", getClassDef("protoContext") ,
                                  defaultContext = newRoot("protoContext", type = "@", isDefaultContext = TRUE))
                              ))
-
     ## Install the super-root cell in the super - root default context
     getClassDef("protoContext")@defaultContext$initCells(`*` = newRoot("protoCell"))
 })
+
+eval(..eloadco0)
+eval(..eloadco1)
+evalOnLoad(..eloadco0)
+evalOnLoad(..eloadco1)
