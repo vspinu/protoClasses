@@ -1,7 +1,7 @@
 exportPattern("^[[:alpha:]]+")
 exportClassPattern("^[[:alpha:]]+")
 importFrom("graphics", plot)
-export(.F, .getType)
+export(F, .getType)
 S3method(.DollarNames, envProtoClass)
 S3method(.DollarNames, protoContext)
 

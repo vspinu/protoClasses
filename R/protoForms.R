@@ -479,8 +479,6 @@ setMethod("initialize", "protoForm",
     ## convert all to protoForm objects
     forms <- lapply(forms, function(el) as(el, "protoForm"))
     ## install all bindings and update the container
-    ##:ess-bp-start::browser@nil:##
-browser(expr=is.null(.BaseNamespaceEnv[['.ESSBP.']][["@8@"]]))##:ess-bp-end:##
     formNames <- names(forms)
     for(i in seq_along(forms))
         installBinding(forms[[i]], whereEnv[[".forms"]], formNames[[i]], after = after)

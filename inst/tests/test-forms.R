@@ -32,7 +32,6 @@ x$initForms(A1 = form(
               B2 = form(
                 C = 20 * 30)))
 
-x$initForms(AAA = form(3*3))
 
 test_that("forms are installed correctly", {
     expect_equal(names(x$forms), c("A1", "A1.B1", "A1.B2", "A2", "A2.B1", "A2.B2"))
