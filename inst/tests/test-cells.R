@@ -11,6 +11,7 @@ test_that("context initializes corectly", {
     expect_is(x, "protoCell")
     expect_is(y, "protoCell")
     expect_is(z, "protoCell")
+    expect_error(protoCell("aaa", "bbb"))
 })
 
 test_that("Long type matches", {

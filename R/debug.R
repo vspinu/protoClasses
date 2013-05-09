@@ -62,7 +62,7 @@ setClass("protoFieldWithBrowser",
         stop(type, " \"", obj_name, "\" is not found in the cell of type \"", .getType(where), "\"")
     obj <- get(obj_name, where)
     if(is(obj, "protoObjectWithBrowser"))
-        warn.pbm("Object \"", obj_name, "\" is already marked for debugging; skipping.")
+        warning("Object \"", obj_name, "\" is already marked for debugging; skipping.")
     else{
         obj_wbr <-
             switch(type,

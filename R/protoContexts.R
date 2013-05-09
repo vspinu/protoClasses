@@ -69,11 +69,18 @@ setMethod("$<-", signature(x = "protoContext"),
               invisible(x)
           })
 
+.DollarNames.protoContext <- function(x, pattern = ""){
+    c(.DollarNames.envProtoClass(x, pattern),
+      .get_all_names(get(".cells", envir = x, inherits = F), exclude_special = F))
+}
+## registerS3method(".DollarNames", "protoContext", .DollarNames.protoContext)
+
 setMethod("setPrototype", "protoContext",
           function(protoObj, prototype){
               callNextMethod()
               parent.env(get(".cells", envir = protoObj)) <- parent.env(get(".cells", envir = prototype))
           })
+
 
 ##' Return TRUE is it's a default context
 ##'

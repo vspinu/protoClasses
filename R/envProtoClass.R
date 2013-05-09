@@ -164,6 +164,14 @@ setMethod("$<-", signature(x = "envProtoClass"),
               invisible(x)
           })
 
+.DollarNames.envProtoClass <- function(x, pattern = ""){
+    ## fixme: implement a gnereric container interface
+    containers <- c(".methods", ".fields", ".forms")
+    unlist(lapply(containers,
+                  function(nm) .get_all_names(get(nm, envir = x, inherits = F), exclude_special = F)),
+           use.names = FALSE)
+}
+## registerS3method(".DollarNames", "envProtoClass", .DollarNames.envProtoClass)
 
 
 ###_ CONTAINERS
@@ -195,7 +203,7 @@ setMethod("names",
 ##           })
 
           
-.get_all_names <- function(container){
+.get_all_names <- function(container, exclude_special = T){
     "Search recursively for names in 'container', returns all names."
     containerEnv <- as.environment(container)
     exclude <- specialNames(container)
@@ -205,7 +213,9 @@ setMethod("names",
         containerEnv <- parent.env(containerEnv)
     }
     all_names <- unique(all_names)
-    all_names[!(all_names %in% exclude)]
+    if(exclude_special)
+        all_names <- all_names[!(all_names %in% exclude)]
+    all_names
 }
 
 .get_all_names_with_host <- function(container){

@@ -16,23 +16,12 @@ setClass("protoForm",
          contains = "expression")
 
 form <- function(..., doc = character()){
-    ## FIXME:  substitute(expression(...)) does not preserve the source
-    ## it looks like there is no other way but to copy the implementation of
-    ## expression() function which is a primitive.
-    ## For now F() incapsulation does the job.
-
-    expr <- substitute(expression(...))
-    if(length(expr) > 1L){
-        for(i in 2:length(expr)){
-            sym <- expr[[i]]
-            if(is.recursive(sym) && (sym[[1]] == as.name(".F") ||
-                                     sym[[1]] == as.name("form") ||
-                                     sym[[1]] == as.name("as.form"))){
-                expr[[i]] <- eval(expr[[i]])
-            }
-        }
-    }
-    new("protoForm", eval(expr), doc = doc)
+    ## All this storry preserves source references
+    mc <- match.call()
+    mc$doc <- NULL
+    mc[[1]] <- as.name("expression")
+    expr <- eval(mc)
+    protoForm(expr, doc = doc)
 }
 
 ## removeMethod("initialize", "protoECall")
@@ -43,16 +32,15 @@ isECall <- function(obj){
         FALSE
 }
 
-.F <- function(expr, doc = character()){
-    ## force evaluation of encapsulated expressions F.(...), form(), as.forms in
-    ## order to generate subexpressions that are actually forms and not just
-    ## expressions.
+protoForm <- function(expr, doc = character()){
+    ## force evaluation of encapsulated expressions F(...), protoForm() and
+    ## as.forms in order to generate subexpressions that are actually forms and
+    ## not just expressions.
     pframe <- parent.frame()
-    ## expr <- eval(substitute(expression(...)))
     if(missing(expr)) expr <- expression()
     for(i in seq_along(expr)){
         sym <- expr[[i]]
-        if(is.recursive(sym) && (sym[[1]] == as.name(".F") ||
+        if(is.recursive(sym) && (sym[[1]] == as.name("protoForm") ||
                                  sym[[1]] == as.name("form") ||
                                  sym[[1]] == as.name("as.form"))){
             expr[[i]] <- eval(expr[[i]], pframe)
@@ -74,6 +62,7 @@ setAs("expression", "protoForm",
           names <- .makeNames(allNames(from))
           new("protoForm", from, names = names)
       })
+
 setAs("call", "protoForm",
       function(from){
           new("protoForm", as.expression(from))
@@ -247,8 +236,8 @@ setClass("protoFormDefinition",
         stopifnot(is(newForm, "protoForm"))
         for(i in seq_along(firstNames)){
             if(!is.null(newForm[[firstNames[[i]]]]))
-                stop.pbm("subexpression `", firstNames[[i]], "` in form `", bindName,
-                         "` is already initialised. Use 'removeForm' first, or 'setForms' instead", env = whereEnv)
+                stop("subexpression `", firstNames[[i]], "` in form `", bindName,
+                     "` is already initialised. Use 'removeForm' first, or 'setForms' instead", env = whereEnv)
         }
         for(i in seq_along(firstNames)){
             newForm[[firstNames[[i]]]] <-
@@ -257,23 +246,23 @@ setClass("protoFormDefinition",
                   form[[i]], container, longNames[[i]],
                   returnBinding = paste(bindName, firstNames[[i]], sep = "."))
         }
-                                        # -------------------------------------------------------------- #
-                                        # install newForm only if different                              #
-                                        # if(exists(bindName, envir = get(".forms", envir = whereEnv))){ #
-                                        #     oldForm <- get(bindName, envir = whereEnv)                 #
-                                        # if(!identical(newForm, oldForm)){                              #
-                                        # -------------------------------------------------------------- #
+        ## -------------------------------------------------------------- #
+        ## install newForm only if different                              #
+        ## if(exists(bindName, envir = get(".forms", envir = whereEnv))){ #
+        ##     oldForm <- get(bindName, envir = whereEnv)                 #
+        ## if(!identical(newForm, oldForm)){                              #
+        ## -------------------------------------------------------------- #
         ## todo: get the followining into unit test somehow
         if(exists(bindName, whereEnv) && 
-           (ln <- length(setdiff(names(get(bindName, whereEnv)), names(newForm)))))
-            warn.pbm("warning: ", ln, " subforms removed in '", bindName, "' form", env = whereEnv)
-        assign(bindName, newForm, envir = whereEnv)
+           (ln <- length(setdiff(names(get(bindName, whereEnv)), names(newForm)))))                
+            warning("warning: ", ln, " subforms removed in '", bindName, "' form", env = whereEnv)
+        assign(bindName, newForm, envir = whereEnv)                                                
         .installBinding_default(new("protoFormDefinition", formClass = class(form)),
                                 container, bindName, ".forms")
-        return(.makeEexpr(returnBinding))
+        .makeEexpr(returnBinding)
     }else{
         ## .assignForm should no be used directly to assign non protoForm objects !!
-        return(form)  ## returns as is (i.e. expression), nothing is assigned
+        form  ## returns as is (i.e. expression), nothing is assigned
     }
 }
 
@@ -347,7 +336,8 @@ setMethod("$", signature(x = "formContainer"),
 }
 
 .setForm <- function(x, name, value, after = NULL, error = TRUE){
-    .dollarSet_formContainer(get(".forms", envir = x), name, value, error, after)
+    .dollarSet_formContainer(get(".forms", envir = x, inherits = F),
+                             name, value, error, after)
 }
 
 setMethod("$<-", signature(x = "formContainer"),
@@ -376,7 +366,7 @@ If name is aa.bb all the registered forms starting with aa.bb (inclusive) will
     ## tothink: do we need this?
     "Emptyfy recursively registred forms.
 If name is aa.bb, all the registered forms starting with aa.bb will
- be emptyfied (i.e. assigned .F()) in selfEnv."
+ be emptyfied (i.e. assigned F()) in selfEnv."
     contEnv <- get(".forms", envir = selfEnv)
     all_names <- .get_all_names(contEnv)
     ## FIXME: need only at the beggingin of the string.
@@ -384,7 +374,7 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     to_empty <-
         to_empty[substring(to_empty, 1, nchar(name)) == name]
     ## unlist is needed in case to_empty is character(0)
-    lapply(to_empty, assign,  value = .F(), envir = selfEnv)
+    lapply(to_empty, assign,  value = F(), envir = selfEnv)
     invisible(NULL)
 }
 
@@ -489,6 +479,8 @@ setMethod("initialize", "protoForm",
     ## convert all to protoForm objects
     forms <- lapply(forms, function(el) as(el, "protoForm"))
     ## install all bindings and update the container
+    ##:ess-bp-start::browser@nil:##
+browser(expr=is.null(.BaseNamespaceEnv[['.ESSBP.']][["@8@"]]))##:ess-bp-end:##
     formNames <- names(forms)
     for(i in seq_along(forms))
         installBinding(forms[[i]], whereEnv[[".forms"]], formNames[[i]], after = after)
