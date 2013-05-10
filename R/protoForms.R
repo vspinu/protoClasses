@@ -87,10 +87,19 @@ setClass("protoFormWithEnv",
          contains = "protoForm") ## used for printing, $ methods returns this object with environment slot set to .self
 
 setMethod("show", signature(object = "protoFormWithEnv"),
-          function(object) .print_ProtoFormWithEnv(object, code = TRUE))
+          function(object) print.protoFormWithEnv(object, code = TRUE))
+
+print.protoFormWithEnv <- function(x, code = TRUE,
+                                   expand = getOption("protoClasses.print_expanded_forms"), ...){
+    if(!is.null(expand) && expand)
+        .print_protoFormWithEnv_expanded(x, code = code)
+    else
+        .print_ProtoFormWithEnv_colapsed(x, code = code)
+}
 
 ## setMethod("print", signature(x = "protoFormWithEnv"),
-print.protoFormWithEnv <- function(x, code = TRUE, ...){
+## settle on S3 generic
+.print_protoFormWithEnv_expanded <- function(x, code = TRUE, ...){
               .sub <- function(te){
                   for( i in seq_along(te)){
                       ## if( class(te)=="{")
@@ -120,7 +129,6 @@ print.protoFormWithEnv <- function(x, code = TRUE, ...){
                       }}
                   te
               }
-
               accum <- new.env()
               where <- x@environment
               ## first one is alwyas recursive expression
@@ -134,51 +142,55 @@ print.protoFormWithEnv <- function(x, code = TRUE, ...){
           }
 
 
-## OLD VERSION, DON'T DELETE FOR TIME BEING
-## .print_ProtoFormWithEnv <- function(x, code = TRUE, ...){
-##     ## assumes that "name" exists and checks are not made.
-##     .print_local <- function(name, where, lev, code){
-##         if(exists(name, envir = where)){
-##             form <- get(name, envir = where)
-##             if(is(form, "protoForm")){
-##                 cat(rep(".. ", lev),"e(", name, ")\n", sep = "")
-##                 if(length(form@doc)) {
-##                     cat("## DOC: \n")
-##                     print(form@doc)
-
-##                 }
-##                 for(i in seq_along(form)){
-##                     fm <- form[[i]]
-##                     if(isECall(fm)){
-##                         Recall(as.character(fm[[2]]), where, lev = lev + 1L, code)
-##                     }else{
-##                         if(code){
-##                             te <- as.expression(fm)[[1]]
-##                             attr(te, "wholeSrcref") <- NULL ## kludge
-##                             attr(te, "srcfile") <- NULL ## kludge
-##                             cat(paste(paste(rep.int("   ", lev), collapse = ""),
-##                                       capture.output(print(te))),  sep ="\n")
-##                         }}
-##                 }
-##             }else{
-##                 cat(rep(".. ", lev),"e(", name, ") <-- missing\n", sep = "")
-##             }
-##         }}
-##     ## cat("##", name, "\n", sep = "")
-##     f_names <- names(x)
-##     for(i in seq_along(x)){
-##         fm <- x[[i]]
-##         if(isECall(fm)){
-##             .print_local(as.character(fm[[2]]), x@environment, lev = 0L, code)
-##         }else{
-##             cat(f_names[[i]], "\n")
-##             te <- as.expression(fm)[[1]]
-##             attr(te, "wholeSrcref") <- NULL ## kludge
-##             attr(te, "srcfile") <- NULL ## kludge
-##             print(te)
-##         }
-##     }
-## }
+.print_ProtoFormWithEnv_colapsed <- function(x, code = TRUE, ...){
+    ## assumes that "name" exists and checks are not made.
+    .print_local <- function(name, where, lev, code){
+        if(exists(name, envir = where)){
+            form <- get(name, envir = where)
+            if(is(form, "protoForm")){
+                cat(rep(".. ", lev),"e(", name, ") ", sep = "")
+                if(length(form@doc)) {
+                    cat("## DOC: \n")
+                    print(form@doc)
+                }
+                for(i in seq_along(form)){
+                    fm <- form[[i]]
+                    if(isECall(fm)){
+                        Recall(as.character(fm[[2]]), where, lev = lev + 1L, code)
+                    }else{
+                        src <- utils::getSrcFilename(fm)
+                        if(length(src))
+                            cat('(from ', src,
+                                "#", utils::getSrcLocation(fm,"line")[[1]], ")\n", sep = "")
+                        else cat("\n")
+                        if(code){
+                            te <- as.expression(fm)[[1]]
+                            ## expand <- .sub(fm)[[1]] ## get rid of "expression"
+                            attr(te, "wholeSrcref") <- NULL ## kludge
+                            attr(te, "srcfile") <- NULL ## kludge
+                            cat(paste(paste(rep.int("   ", lev), collapse = ""),
+                                      capture.output(print(te))),  sep ="\n")
+                        }}
+                }
+            }else{
+                cat(rep(".. ", lev),"e(", name, ") <-- missing ", sep = "")
+            }
+        }}
+    ## cat("##", name, "\n", sep = "")
+    f_names <- names(x)
+    for(i in seq_along(x)){
+        fm <- x[[i]]
+        if(isECall(fm)){
+            .print_local(as.character(fm[[2]]), x@environment, lev = 0L, code)
+        }else{
+            cat(f_names[[i]], "\n")
+            te <- as.expression(fm)[[1]]
+            attr(te, "wholeSrcref") <- NULL ## kludge
+            attr(te, "srcfile") <- NULL ## kludge
+            print(te)
+        }
+    }
+}
 
 
 
@@ -237,7 +249,7 @@ setClass("protoFormDefinition",
         for(i in seq_along(firstNames)){
             if(!is.null(newForm[[firstNames[[i]]]]))
                 stop("subexpression `", firstNames[[i]], "` in form `", bindName,
-                     "` is already initialised. Use 'removeForm' first, or 'setForms' instead", env = whereEnv)
+                     "` is already initialised. Use 'removeForm' first, or 'setForms' instead")
         }
         for(i in seq_along(firstNames)){
             newForm[[firstNames[[i]]]] <-

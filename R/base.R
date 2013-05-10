@@ -314,16 +314,13 @@ Return NULL if trigger_error = FALSE and match not found."
 
 
 ###_ ONLOAD
-
 .onLoad  <- function(libname, pkgname){
     where <- environment(sys.function())  # the namespace
 
     options(protoClasses.changeCallEnv = FALSE,
-            protoClasses.debugMode = TRUE)
+            protoClasses.debugMode = TRUE,
+            protoClasses.print_expanded_forms = FALSE)
 }
-
-
-
 
 ## Local Variables:
 ## ess-roxy-template-alist: (
@@ -339,7 +336,6 @@ Return NULL if trigger_error = FALSE and match not found."
 ##  ;;("references" . "\\url{https://docs.developer.betfair.com/betfair/}")
 ##  )
 ## end:
-    
 
 ## for(nm in c(
 ##             "envProtoClass.R", 

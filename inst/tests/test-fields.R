@@ -28,8 +28,7 @@ test_that("Accessing with '$fields' works",{
     expect_identical(Y$fields$string, "test")
     expect_identical(Y$fields$integer, 232L)
     expect_error(X$fields$sfdsfdsfd)
-    ## recursive lists work for accessor:
-    expect_equal(length(names(X$fields)), 8L)
+    expect_equal(length(names(X$fields)), 2L)
 })
 
 test_that("setField works:",{
@@ -63,7 +62,6 @@ test_that("Fields clear as expected:", {
     X$setFields(string = NULL)
     X$initFields(string = NULL)
     expect_warning(Y$initFields(string = NULL))
-    X$initFields(string = NULL)
     expect_error(X$fields$string)
     expect_error(Y$string)   
 })

@@ -179,22 +179,22 @@ setClass("protoContainer",
          representation = list(typeContainer = "character", host = "envProtoClass"),
          contains = "environment")
 
-setMethod("$", signature(x = "protoContainer"),
+setMethod("$", c(x = "protoContainer"),
           definition = function(x, name) get(name, envir = x))
 
-setMethod("show", signature(object = "protoContainer"),
+setMethod("show", c(object = "protoContainer"),
           function(object){
               ## callNextMethod()
               cat(gettextf("A container of class \"%s\"\n", class(object)))
               methods:::.printNames("Contains: ", .get_all_names(object))
           })
 
-setMethod("names",
-          signature(x = "protoContainer"),
-          function (x) {
-              .get_all_names(x)
-          })
+setMethod("names", c(x = "protoContainer"),
+          function(x) .get_all_names(x))
 
+setGeneric("allNames", methods::allNames)
+setMethod("allNames", c(x = "protoContainer"),
+          function(x) .get_all_names(x, exclude_special = FALSE))
 
 ## setMethod("length",
 ##           signature(x = "protoContainer"),
@@ -218,14 +218,16 @@ setMethod("names",
     all_names
 }
 
-.get_all_names_with_host <- function(container){
+.get_all_names_with_host <- function(container, exclude_special = T){
     "Search recursively for names in 'container', return a list of the form
 list(typeA = c('foo', 'bar'), typeB = ...)"
     host <- as.environment(container@host)
 
     if(is.character(container))
         container <- host[[container]]
-    exclude <- specialNames(container)
+    exclude <-
+        if(exclude_special) specialNames(container)
+        else c()
     containerEnv <- as.environment(container)
     all_names <- list()
     while(!identical(containerEnv, emptyenv())){
@@ -422,11 +424,12 @@ setMethod("initializeRoot", "envProtoClass",
                 undebug = function(..., .methods = c(), .fields = c(), .forms = c(), .where = .self){
                     .undebugObjects(list(...), .methods, .fields, .forms, .where = .self)
                 },
-                inspect = function()
-                eval(substitute({browser(skipCalls = 2);browser(skipCalls = 2)}), envir = .self), 
-                expr = function(expr){
-                    invisible(eval(substitute(expr), envir = .self))
-                }),where = objEnv)
+                inspect = function(){
+                    eval(substitute({browser(skipCalls = 2);browser(skipCalls = 2)}), envir = .self)
+                },
+                eval = function(expr) eval(expr, envir = .self),
+                evalq = function(expr) eval(substitute(expr), envir = .self)
+                ), where = objEnv)
               
               ## "USER" FIELDS:
               .initFields(initFields, .Object)

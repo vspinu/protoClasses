@@ -42,11 +42,20 @@ test_that("containers preserve inheritance", {
 
 
 test_that("no spurious objects appear in containers", {
-    expect_identical(.get_all_names(Z$methods), c("debug", "inspect", "new", "undebug"))
-    expect_identical(.get_all_names(Z$forms), character())
-    expect_identical(.get_all_names(Z$fields),
-                     c("cells", "fields", "forms", "methods", "proto", "rootCellParentEnv"))
-    expect_identical(.get_all_names(Z$cells), "*")
+    expect_identical(names(Z$methods),character())
+    expect_identical(names(Z$forms), character())
+    expect_identical(names(Z$fields), character())
+    expect_identical(names(Z$cells), "*")
+
+    ## there should be setCells as well? 
+    expect_equal(allNames(Z$methods),
+                 c("debug", "eval", "evalq",
+                   "initCells", "initFields", "initForms", "initMethods", 
+                   "inspect", "new", "setFields", "setForms", "setMethods", "undebug"))
+    expect_equal(allNames(Z$fields),
+                 c("cells", "fields", "forms", "methods", "proto", "rootCellParentEnv", 
+                   "type", "Type"))
+    expect_equal(allNames(Z$forms), character())
 })    
 
 

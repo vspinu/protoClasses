@@ -43,9 +43,11 @@ setMethod("$<-", signature(x = "methodContainer"),
     .dollarSet_methodContainer(get(".methods", envir = x), name, value, error)
 
 setMethod("specialNames", "methodContainer",
-          function(protoObject) c("cells", "expr", "fields", "forms", "initCells", "initFields", 
-                                  "initForms", "initMethods", "methods", "setFields", "setForms", 
-                                  "setMethods"))
+          function(protoObject)
+          c("initCells", "initFields", "initForms", "initMethods",
+            "setFields", "setForms", "setMethods",
+            "eval", "evalq", "new", 
+            "inspect", "debug", "undebug"))
 
 ## .existsMethod <- function(name, selfEnv){
 ##     exists(name, envir = selfEnv[[".methods"]])

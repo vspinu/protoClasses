@@ -32,7 +32,6 @@ x$initForms(A1 = form(
               B2 = form(
                 C = 20 * 30)))
 
-
 test_that("forms are installed correctly", {
     expect_equal(names(x$forms), c("A1", "A1.B1", "A1.B2", "A2", "A2.B1", "A2.B2"))
     expect_is(x$A1, "protoFormWithEnv")
@@ -51,3 +50,24 @@ test_that("forms are installed correctly", {
     expect_error(x$A1.B1.C)
     expect_true(isECall(x$A1[[1]]))
 })
+
+x$initForms(D = form(
+              E1 = form({
+                  a <- 10
+              }),
+              E2 = form(
+                F = form({
+                    a*10
+                }))
+              ))
+
+test_that("auto generation of names works", {
+    expect_equal(names(x$D.E1), "A")
+})
+
+test_that("forms evaluate correctly", {
+    expect_equal(x$evalq(e(D)), 100)
+    expect_error(x$eval(a))
+    expect_equal(x[["a"]], 10)
+})
+

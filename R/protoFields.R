@@ -103,7 +103,9 @@ setMethod("$<-", signature(x = "fieldContainer"),
           function(x, name, value) .dollarSet_fieldContainer(x, name, value))
 
 setMethod("specialNames", "fieldContainer",
-          function(protoObject) c("f", "h", "m", "type", "Type"))
+          function(protoObject)
+          c("cells", "fields", "forms", "methods",
+            "proto", "rootCellParentEnv", "type", "Type"))
 
 ## .existsField <- function(name, selfEnv){
 ##     exists(name, envir = selfEnv[[".fields"]])

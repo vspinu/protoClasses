@@ -41,10 +41,9 @@ test_that("containers preserve inheritance", {
 })
 
 test_that("no spurious objects appear in containers", {
-    expect_identical(.get_all_names(z$methods), c("debug", "inspect", "new", "undebug"))
+    expect_identical(.get_all_names(z$methods), character())
     expect_identical(.get_all_names(z$forms), character())
-    expect_identical(.get_all_names(z$fields),
-                     c("fields", "forms", "methods", "proto"))
-})    
+    expect_identical(.get_all_names(z$fields), character())
+})
 
 

@@ -6,16 +6,18 @@ S3method(.DollarNames, envProtoClass)
 S3method(.DollarNames, protoContext)
 
 exportMethods(
-    "$",
-    "$<-",
-    "[",
-    "clone",
-    "coerce",
-    ## "initialize",
-    ## "initializeRoot",
-    "installBinding",
-    ## "plot", S3
-    ## "print", S3
-    "setPrototype",
-    "show" 
-)
+  "$",
+  "$<-",
+  "[",
+  "clone",
+  "coerce",
+  ## "initialize",
+  ## "initializeRoot",
+  "installBinding",
+  ## "plot", S3
+  ## "print", S3
+  "setPrototype",
+  "names", 
+  "allNames", 
+  "show" 
+  )
