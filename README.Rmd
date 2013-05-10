@@ -2,8 +2,10 @@
 % Vitalie Spinu
 % 2013/05/10
 
-
-
+```{r setup, include=FALSE}
+# set global chunk options
+opts_chunk$set(cache=TRUE)
+```
 # Contextual prototype programming in R.
 
 Prototype programming is an object oriented (OO) programming paradigm that uses
@@ -64,42 +66,23 @@ from S4 class environment. See [implementation].
 
 Each proto object has a short type (object name), which default to "--":
 
-
-```R
+```{r short types}
 library(protoClasses)
 x <- protoCell()
 x$type
 ```
 
-```
-## [1] "--"
-```
-
-
 All protoCells inherit from the root cell with the name "*". The long type (full
 name) consists of the concatenation of all the short types of its direct and
 indirect prototypes:
 
-
-```R
+```{r long types}
 x <- protoCell(type = "x")
 y <- x$new(type = "y")
 z <- y$new("funny_type")
 z$type
-```
-
-```
-## [1] "funny_type"
-```
-
-```R
 z$Type
 ```
-
-```
-## [1] "funny_type.y.x.*"
-```
-
 
 In the above example `x` is a prototype of `y`, and `y` is a prototype of
 `z` and it means in technical terms that `x` is parent environment of `y`, and
@@ -122,34 +105,15 @@ Simple interface builds the default accessor function that simply assigns and
 retrieves the value in the proto object with the appropriate conversion as given
 by the class of initial value supplied. For example:
 
-
-```R
-x$initFields(int = 12L, str = "sfdsfdf")
+```{r}
+x$initFields(int = 12L,
+             str = "sfdsfdf")
 x$int
-```
-
-```
-## [1] 12
-```
-
-```R
 x$int <- 13.3
 x$int
-```
-
-```
-## [1] 13
-```
-
-```R
 x$str <- 13.3
 x$str
 ```
-
-```
-## [1] "13.3"
-```
-
 
 In the above example `int` fields assign and retrieves an integer value from the
 object; `str` is always a string.
@@ -157,97 +121,46 @@ object; `str` is always a string.
 Children of `x` automatically inherit all the fields (also methods and forms)
 from their parents:
 
-
-```R
+```{r}
 y$int
-```
-
-```
-## [1] 13
-```
-
-```R
 z$int
-```
-
-```
-## [1] 13
-```
-
-```R
 y$int <- -100
 z$int
 ```
-
-```
-## [1] -100
-```
-
 Fields can be accessed by means of the built in field `fields`:
 
-
-```R
+```{r}
 x$fields$int
 ```
-
-```
-## [1] 13
-```
-
 
 Default fields assign the object in the proto environment with the same names as
 supplied during the initialization:
 
-
-```R
+```{r}
 ls(x)
 ```
 
-```
-## [1] "e"   "int" "str"
-```
-
-
 For a more complex fields you can supply accesses directly:
 
-
-```R
+```{r}
 liquid <- protoCell("liquid")
 
-liquid$initFields(kelvin = 0, celsius = protoField(function(value) {
-    if (missing(value)) {
-        kelvin + 273.15
-    } else {
-        assign("kelvin", value - 273.15, envir = .self)
-        invisible(value)
-    }
-}))
+liquid$initFields(kelvin = 0,
+                  celsius = protoField(
+                    function(value){
+                        if(missing(value)){
+                            kelvin + 273.15
+                        }else{
+                            assign("kelvin", value - 273.15, envir = .self)
+                            invisible(value)
+                        }}))
 
 liquid$celsius
-```
-
-```
-## [1] 273.1
-```
-
-```R
 liquid$kelvin <- 100
 liquid$celsius
-```
-
-```
-## [1] 373.1
-```
-
-```R
 liquid$celsius <- 100
 liquid$kelvin
 ```
-
-```
-## [1] -173.1
-```
-
 
 The convention for field accessor is pretty simple. It is a function one
 argument and it is called with no argument if it is used as a getter (liquid$celsius)
@@ -263,21 +176,24 @@ Often it is useful to access other fields from withing field accessor. This
 could be done by means of object `.self` or by using `.fields` container from
 within accessor function. The following are equivalent in terms of behavior:
 
-
-```R
-fahrenheit1 <- function(value) {
-    if (missing(value)) 
-        .fields$celsius * 9/5 + 32 else .fields$celsius <- (value - 32) * 5/9
+```{r}
+fahrenheit1 <- function(value){
+    if(missing(value))
+        .fields$celsius*9/5 + 32
+    else
+        .fields$celsius <- (value - 32)*5/9
 }
 
-fahrenheit2 <- function(value) {
-    if (missing(value)) 
-        .self$fields$celsius * 9/5 + 32 else .self$fields$celsius <- (value - 32) * 5/9
+fahrenheit2 <- function(value){
+    if(missing(value))
+        .self$fields$celsius*9/5 + 32
+    else
+        .self$fields$celsius <- (value - 32)*5/9
 }
 
-liquid$initFields(fahr1 = protoField(fahrenheit1), fahr2 = protoField(fahrenheit2))
+liquid$initFields(fahr1 = protoField(fahrenheit1),
+               fahr2 = protoField(fahrenheit2))
 ```
-
 
 The first version of fields uses the internal container `.field` that stores all
 the accessors. Same holds for methods, forms and cells, which are stored in
@@ -292,10 +208,9 @@ of dynamic scope.
 
 For example:
 
-
-```R
-liquid$initMethods(freeze = function() .self$celsius <- freezing_temp,
-                   boil = function() .self$celsius <- boiling_temp, 
+```{r}
+liquid$initMethods(freeze = function() .self$celsius <- freezing_temp, 
+                   boil = function() .self$celsius <- boiling_temp,
                    warm_up = function(by = 10) assign("kelvin", kelvin + by, .self))
 
 liquid$celsius <- 100
@@ -303,43 +218,19 @@ liquid$warm_up(33)
 liquid$celsius
 ```
 
-```
-## [1] 133
-```
-
-
 The `freeze` and `boil` methods will through an error because `freezing_temp` and
 `boiling_temp` are undefined.
 
-
-```R
-watter <- liquid$new("watter", expr = expression(freezing_temp = 0, boiling_temp = 100))
+```{r}
+watter <- liquid$new("watter",
+                  expr = expression(freezing_temp = 0, boiling_temp = 100))
 
 watter$celsius <- 17
 watter$warm_up(13)
 watter$celsius
-```
-
-```
-## [1] 30
-```
-
-```R
 watter$freeze()
-```
-
-```
-## Error: object 'freezing_temp' not found
-```
-
-```R
 watter$celsius
 ```
-
-```
-## [1] 30
-```
-
 
 The above example ilustriate the crucial distinction between OO and functional
 programming - dinamic scoping. The scope of `freeze` and `boil` methods is being
@@ -354,55 +245,32 @@ Proto forms are specially managed expressions. They allow selective inheritance
 of the code. As you will see proto forms inheritance is the ultimate example of
 code reuse.
 
-
-```R
-x$initForms(A = form(B1 = form({
-    a <- 10
-}), B2 = form(C = form({
-    a * 10
-}))))
+```{r}
+x$initForms(A = form(
+              B1 = form({
+                  a <- 10
+              }),
+              B2 = form(
+                C = form({
+                    a*10
+                }))))
 
 x$A
 ```
 
-```
-## e(A.B1) (from <text>#1)
-##  {
-##      a <- 10
-##  }
-## e(A.B2)
-## .. e(A.B2.C) (from <text>#3)
-##     {
-##         a * 10
-##     }
-```
-
-
 Let's write a method to test this out.
 
-
-```R
-x$initMethods(test = function() e(A))  ## e function evaluates forms in .self environent
+```{r}
+x$initMethods(test = function() e(A)) ## e function evaluates forms in .self environent
 x$test()
 ```
 
-```
-## [1] 100
-```
-
-
 Now replace `A.B1` form:
 
-
-```R
+```{r}
 y$setForms(A.B1 = form(a <- -10))
 y$test()
 ```
-
-```
-## [1] -100
-```
-
 
 
 ## Proto Context

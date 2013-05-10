@@ -2,15 +2,13 @@ context("Forms")
 
 x <- protoCell("x")
 
-f <- form(
-  first =
-  form({a <- 23
-        a + 3},
-       form(pp <- 34)),
-  second = {
-      b <- 100
-      a + b
-  })
+f <- form( first = form({a <- 23
+                         a + 3},
+                        form(pp <- 34)),
+          second = {
+              b <- 100
+              a + b
+          })
 
 test_that("recursive form initialization works", {
     expect_is(f, "protoForm")

@@ -3,7 +3,8 @@ paper
 ^.*\.Rproj$
 ^\.Rproj\.user$
 .git
-README.md
+README*
 .Rproj.user
 .Rhistory
 .DS_Store
+cache/*

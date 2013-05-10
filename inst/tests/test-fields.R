@@ -95,3 +95,25 @@ test_that("Virtual (ANY) classes behave as expected",{
     Y$string <- "text"
     expect_identical(Y$string, "text")
 })
+
+
+
+## fahrenheit1 <- function(value){
+##     if(missing(value))
+##         .fields$celsius*9/5 + 32
+##     else
+##         .fields$celsius <- (value - 32)*5/9
+## }
+
+## fahrenheit2 <- function(value){
+##     if(missing(value))
+##         .self$fields$celsius*9/5 + 32
+##     else
+##         .self$fields$celsius <- (value - 32)*5/9
+## }
+
+## x$initFields(fahr1 = protoField(fahrenheit1),
+##              fahr2 = protoField(fahrenheit2))
+
+## x$fahr1 <- 32
+## x$fahr2 <- 32
