@@ -1,6 +1,6 @@
-% Contextual prototype programming in R
-% Vitalie Spinu
-% 2013/05/10
+<!-- % Contextual prototype programming in R -->
+<!-- % Vitalie Spinu -->
+<!-- % 2013/05/10 -->
 
 ```{r setup, include=FALSE}
 # set global chunk options
@@ -66,7 +66,7 @@ from S4 class environment. See [implementation].
 
 Each proto object has a short type (object name), which default to "--":
 
-```{r short types}
+```{r short types, warnings = FALSE}
 library(protoClasses)
 x <- protoCell()
 x$type
@@ -140,7 +140,7 @@ supplied during the initialization:
 ls(x)
 ```
 
-For a more complex fields you can supply accesses directly:
+For a more complex fields you can supply accessors directly:
 
 ```{r}
 liquid <- protoCell("liquid")

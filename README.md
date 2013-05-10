@@ -1,6 +1,6 @@
-% Contextual prototype programming in R
-% Vitalie Spinu
-% 2013/05/10
+<!-- % Contextual prototype programming in R -->
+<!-- % Vitalie Spinu -->
+<!-- % 2013/05/10 -->
 
 
 
@@ -65,7 +65,7 @@ from S4 class environment. See [implementation].
 Each proto object has a short type (object name), which default to "--":
 
 
-```R
+```r
 library(protoClasses)
 x <- protoCell()
 x$type
@@ -81,7 +81,7 @@ name) consists of the concatenation of all the short types of its direct and
 indirect prototypes:
 
 
-```R
+```r
 x <- protoCell(type = "x")
 y <- x$new(type = "y")
 z <- y$new("funny_type")
@@ -92,7 +92,7 @@ z$type
 ## [1] "funny_type"
 ```
 
-```R
+```r
 z$Type
 ```
 
@@ -123,7 +123,7 @@ retrieves the value in the proto object with the appropriate conversion as given
 by the class of initial value supplied. For example:
 
 
-```R
+```r
 x$initFields(int = 12L, str = "sfdsfdf")
 x$int
 ```
@@ -132,7 +132,7 @@ x$int
 ## [1] 12
 ```
 
-```R
+```r
 x$int <- 13.3
 x$int
 ```
@@ -141,7 +141,7 @@ x$int
 ## [1] 13
 ```
 
-```R
+```r
 x$str <- 13.3
 x$str
 ```
@@ -158,7 +158,7 @@ Children of `x` automatically inherit all the fields (also methods and forms)
 from their parents:
 
 
-```R
+```r
 y$int
 ```
 
@@ -166,7 +166,7 @@ y$int
 ## [1] 13
 ```
 
-```R
+```r
 z$int
 ```
 
@@ -174,7 +174,7 @@ z$int
 ## [1] 13
 ```
 
-```R
+```r
 y$int <- -100
 z$int
 ```
@@ -186,7 +186,7 @@ z$int
 Fields can be accessed by means of the built in field `fields`:
 
 
-```R
+```r
 x$fields$int
 ```
 
@@ -199,7 +199,7 @@ Default fields assign the object in the proto environment with the same names as
 supplied during the initialization:
 
 
-```R
+```r
 ls(x)
 ```
 
@@ -208,10 +208,10 @@ ls(x)
 ```
 
 
-For a more complex fields you can supply accesses directly:
+For a more complex fields you can supply accessors directly:
 
 
-```R
+```r
 liquid <- protoCell("liquid")
 
 liquid$initFields(kelvin = 0, celsius = protoField(function(value) {
@@ -230,7 +230,7 @@ liquid$celsius
 ## [1] 273.1
 ```
 
-```R
+```r
 liquid$kelvin <- 100
 liquid$celsius
 ```
@@ -239,7 +239,7 @@ liquid$celsius
 ## [1] 373.1
 ```
 
-```R
+```r
 liquid$celsius <- 100
 liquid$kelvin
 ```
@@ -264,7 +264,7 @@ could be done by means of object `.self` or by using `.fields` container from
 within accessor function. The following are equivalent in terms of behavior:
 
 
-```R
+```r
 fahrenheit1 <- function(value) {
     if (missing(value)) 
         .fields$celsius * 9/5 + 32 else .fields$celsius <- (value - 32) * 5/9
@@ -293,10 +293,9 @@ of dynamic scope.
 For example:
 
 
-```R
-liquid$initMethods(freeze = function() .self$celsius <- freezing_temp,
-                   boil = function() .self$celsius <- boiling_temp, 
-                   warm_up = function(by = 10) assign("kelvin", kelvin + by, .self))
+```r
+liquid$initMethods(freeze = function() .self$celsius <- freezing_temp, boil = function() .self$celsius <- boiling_temp, 
+    warm_up = function(by = 10) assign("kelvin", kelvin + by, .self))
 
 liquid$celsius <- 100
 liquid$warm_up(33)
@@ -312,7 +311,7 @@ The `freeze` and `boil` methods will through an error because `freezing_temp` an
 `boiling_temp` are undefined.
 
 
-```R
+```r
 watter <- liquid$new("watter", expr = expression(freezing_temp = 0, boiling_temp = 100))
 
 watter$celsius <- 17
@@ -324,7 +323,7 @@ watter$celsius
 ## [1] 30
 ```
 
-```R
+```r
 watter$freeze()
 ```
 
@@ -332,7 +331,7 @@ watter$freeze()
 ## Error: object 'freezing_temp' not found
 ```
 
-```R
+```r
 watter$celsius
 ```
 
@@ -355,7 +354,7 @@ of the code. As you will see proto forms inheritance is the ultimate example of
 code reuse.
 
 
-```R
+```r
 x$initForms(A = form(B1 = form({
     a <- 10
 }), B2 = form(C = form({
@@ -370,8 +369,7 @@ x$A
 ##  {
 ##      a <- 10
 ##  }
-## e(A.B2)
-## .. e(A.B2.C) (from <text>#3)
+## e(A.B2) .. e(A.B2.C) (from <text>#3)
 ##     {
 ##         a * 10
 ##     }
@@ -381,7 +379,7 @@ x$A
 Let's write a method to test this out.
 
 
-```R
+```r
 x$initMethods(test = function() e(A))  ## e function evaluates forms in .self environent
 x$test()
 ```
@@ -394,7 +392,7 @@ x$test()
 Now replace `A.B1` form:
 
 
-```R
+```r
 y$setForms(A.B1 = form(a <- -10))
 y$test()
 ```
