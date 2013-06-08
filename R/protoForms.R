@@ -156,6 +156,7 @@ print.protoFormWithEnv <- function(x, code = TRUE,
                 for(i in seq_along(form)){
                     fm <- form[[i]]
                     if(isECall(fm)){
+                        cat("\n")
                         Recall(as.character(fm[[2]]), where, lev = lev + 1L, code)
                     }else{
                         src <- utils::getSrcFilename(fm)
@@ -190,6 +191,7 @@ print.protoFormWithEnv <- function(x, code = TRUE,
             print(te)
         }
     }
+    cat("\n")
 }
 
 
@@ -267,7 +269,7 @@ setClass("protoFormDefinition",
         ## todo: get the followining into unit test somehow
         if(exists(bindName, whereEnv) && 
            (ln <- length(setdiff(names(get(bindName, whereEnv)), names(newForm)))))                
-            warning("warning: ", ln, " subforms removed in '", bindName, "' form", env = whereEnv)
+            warning("warning: ", ln, " subforms removed in '", bindName, "' form")
         assign(bindName, newForm, envir = whereEnv)                                                
         .installBinding_default(new("protoFormDefinition", formClass = class(form)),
                                 container, bindName, ".forms")
@@ -275,7 +277,7 @@ setClass("protoFormDefinition",
     }else{
         ## .assignForm should no be used directly to assign non protoForm objects !!
         form  ## returns as is (i.e. expression), nothing is assigned
-    }
+      }
 }
 
 setMethod("installBinding", "protoForm", .installBinding_protoForm)

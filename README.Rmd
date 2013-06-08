@@ -3,7 +3,7 @@
 <!-- % 2013/05/10 -->
 
 ```{r setup, include=FALSE}
-# set global chunk options
+#set global chunk options
 opts_chunk$set(cache=TRUE)
 ```
 # Contextual prototype programming in R.
@@ -76,7 +76,7 @@ All protoCells inherit from the root cell with the name "*". The long type (full
 name) consists of the concatenation of all the short types of its direct and
 indirect prototypes:
 
-```{r long types}
+```{r long types} 
 x <- protoCell(type = "x")
 y <- x$new(type = "y")
 z <- y$new("funny_type")
@@ -246,8 +246,9 @@ of the code. As you will see proto forms inheritance is the ultimate example of
 code reuse.
 
 ```{r}
+
 x$initForms(A = form(
-              B1 = form({
+ B1 = form({
                   a <- 10
               }),
               B2 = form(

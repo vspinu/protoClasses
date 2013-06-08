@@ -45,7 +45,7 @@ setMethod("clone", "envProtoClass",
               y <- x
               xEnv <- as.environment(x)
               y@.xData <- yEnv <- new.env(TRUE, parent = parent.env(xEnv))
-              lapply(xEnv[[".cloneFirst"]], eval, envir = yEnv)
+              ## lapply(xEnv[[".cloneFirst"]], eval, envir = yEnv)
               x_names <- ls(envir=xEnv, all.names=TRUE)
               exclude_names <- c(exclude_names, ".self", ".prototype", ".homeContext", 
                                  as.character(xEnv[[".cloneExclude"]]))
@@ -64,11 +64,10 @@ setMethod("clone", "envProtoClass",
                   ## yEnv[[".root"]] <- y
                   yEnv[[".prototype"]] <- NULL ## just in case
               }
-
               .changeEnvFuncs(yEnv) ## fixme: should change environments only of those which point to xEnv!!!
               .changeEnvEnvs(yEnv, changeThisOnly = xEnv)
               .changeContainersHosts(y) ## make .self of containers to point to "y" object
-              lapply(xEnv[[".cloneLast"]], eval, envir = yEnv)
+              ## lapply(xEnv[[".cloneLast"]], eval, envir = yEnv)
               return(y)
           })
 
@@ -78,7 +77,7 @@ setMethod("clone", "cellContainer",
               ## tothink:might be necessary for complete replication
               y <- callNextMethod()
               cell_names <- ls(y, all.names = TRUE)
-              ## redirect new chells to new prototypes
+              ## redirect new chells to new prototypes (empty always?)
               lapply(cell_names, function(nm){
                   if(!isRoot(y[[nm]])){
                       tp <- .getType(y[[nm]][[".prototype"]])
@@ -93,8 +92,9 @@ setMethod("clone", "cellContainer",
 
 setMethod("clone", "protoContext",
           function(x, exclude_names = c(), clone.cells = FALSE, ...){
-              ## exclude_names <- unique(exclude_names, ".cells")
+              exclude_names <- unique(c(exclude_names, ".rootCellParentEnv"))
               y <- callNextMethod(x, exclude_names = exclude_names, ...)
+              y[[".rootCellParentEnv"]] <- x[[".rootCellParentEnv"]]
               ## change homeContext of cells to y
               cells <- y[[".cells"]]
               cell_names <- ls(cells, all.names = TRUE)

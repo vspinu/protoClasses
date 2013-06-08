@@ -1,15 +1,5 @@
 ###_ UTILS
 
-.setType <- function(object, type){
-    if(is(object, "protoCellDefinition"))
-        object[["type"]] <- type
-    else if (is(object, "protoCell"))
-        assign(".type", type, envir = object)
-    else
-        stop("can not set the type for object of class \"", class(object), "\"")
-    object
-}
-
 .getType <- function(object, fullName = T, collapse = ".", base_only = FALSE){
     if(is(object, "protoCellDefinition")) return(object[["type"]])
     if(is.null(object)) return("NULL")
@@ -29,25 +19,43 @@
     else type_local(object)
 }
 
+
+.setType <- function(object, type){
+    if(is(object, "protoCellDefinition"))
+        object[["type"]] <- type
+    else if (is(object, "protoCell")){
+        assign(".type", type, envir = object)
+        env <- attr(getSrcref(get("e", object)), "srcfile")
+        env[["filename"]] <- paste0("proto:", .getType(object))
+    }else
+        stop("can not set the type for object of class \"", class(object), "\"")
+    object
+}
+
 .getPrototype <- function(cell)
     as.environment(cell)[[".prototype"]]
 
 .insertSpecial <- function(objEnv, self, prototype){
     ## SPECIAL OBJECTS present in every envProtoObject:
     ## FUNCTIONS:
-    e = eval(substitute(function(expr, type = "--")
-      .Internal(eval(expr, envir, envir)), list(envir = objEnv)))
+    ## e <- eval(substitute(function(expr, type = "--")
+    ##                      .Internal(eval(expr, envir, envir)), list(envir = objEnv)))
+    e <- eval(substitute(function(expr, type = "--")
+                         .Internal(eval(expr, envir, envir)), list(envir = objEnv)))
     environment(e) <- objEnv
     objEnv[["e"]] <- e
     objEnv[[".protozize"]] <- .protozize
     environment(objEnv[[".protozize"]]) <- objEnv
     objEnv[[".PROTOZIZE"]] <- .PROTOZIZE
     environment(objEnv[[".PROTOZIZE"]]) <- objEnv
-    objEnv[[".cloneExclude"]] <- c()
-    objEnv[[".cloneFirst"]] <- list()
-    objEnv[[".cloneLast"]] <- list()
+    ## objEnv[[".cloneExclude"]] <- c()
+    ## objEnv[[".cloneFirst"]] <- list()
+    ## objEnv[[".cloneLast"]] <- list()
     objEnv[[".self"]] <- self
     objEnv[[".prototype"]] <- prototype
+    
+    env <- attr(getSrcref(get("e", objEnv)), "srcfile")
+    env[["filename"]] <- paste0("proto:", .getType(objEnv))
 }
 
 isValidProtoObject <- function(object, trigger_error = FALSE, object_name = "Object"){
@@ -185,7 +193,8 @@ setMethod("$", c(x = "protoContainer"),
 setMethod("show", c(object = "protoContainer"),
           function(object){
               ## callNextMethod()
-              cat(gettextf("A container of class \"%s\"\n", class(object)))
+              cat(gettextf("A container of class \"%s\"  %s\n",
+                           class(object), format(as.environment(object))))
               methods:::.printNames("Contains: ", .get_all_names(object))
           })
 

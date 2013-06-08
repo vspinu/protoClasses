@@ -212,9 +212,6 @@ areIdentical <- function(c1, c2){
 .rootMetaName <- ".|.root"
 .defaultMetaName <- ".|.defaultContext"
 
-.gen_mirr_name <- function(mname)
-    paste0("_", mname)
-
 .signAsRoot <- function(envProtoObj)
     assign(.rootMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
 

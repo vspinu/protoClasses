@@ -355,6 +355,7 @@ code reuse.
 
 
 ```r
+
 x$initForms(A = form(B1 = form({
     a <- 10
 }), B2 = form(C = form({
@@ -365,11 +366,11 @@ x$A
 ```
 
 ```
-## e(A.B1) (from <text>#1)
+## e(A.B1) (from <text>#2)
 ##  {
 ##      a <- 10
 ##  }
-## e(A.B2) .. e(A.B2.C) (from <text>#3)
+## e(A.B2) .. e(A.B2.C) (from <text>#4)
 ##     {
 ##         a * 10
 ##     }

@@ -82,10 +82,6 @@ setMethod("installBinding", "protoCellDefinition",
 
 cellFromDefinition <- function(protoCellDefinition, homeContext){
     stopifnot(is(protoCellDefinition, "protoCellDefinition"))
-    ## infer name! SIDE EFFECT (does not work here,  this func is called usually  internally)
-    ## nameCell <- substitute(protoCellDefinition)
-    ## if(is.name(nameCell) && identical(protoCellDefinition[["type"]], "--"))
-    ##     protoCellDefinition[["type"]] <- as.character(nameCell)
     if(is(protoCellDefinition$prototype, "protoCellDefinition"))
         protoCellDefinition[["prototype"]] <- cellFromDefinition(protoCellDefinition$prototype, homeContext)
     protoCellDefinition[["homeContext"]] <- homeContext
@@ -134,8 +130,8 @@ leafNames <- function(cellContainer){
 }
 
 .installCellInContainer <- function(cell, container){
-    ## CELL and PROTOTYPES are cloned if not homeless or not already  associated
-    ## with CONTEXT.
+    ## CELL and PROTOTYPES are cloned unless homeless or not already  associated
+    ## with HOST of the container (CONTEXT).
     ## CELL and missing PROTOTYPES are inserted into the container (i.e. prototype
     ## chain is followed as long as proto_type is not found in current context).
     ## return an installed (might be the same) cell
@@ -155,7 +151,7 @@ leafNames <- function(cellContainer){
         cell <- as(cell, tCls)  ## note: some functionality might be missing, provide explicit coerce method.
     containerEnv <- as.environment(container)
     if(identical("--", as.environment(cell)[[".type"]]))
-        stop("Cannot install cell of type \"--\"; please supply the type argument.")
+        stop("Cannot install cell of type \"--\"; please supply the 'type' argument.")
     
     ## KEEP CLONING and INSERTING  prototypes when not in the container
     cell_to_return <- cell
@@ -178,8 +174,7 @@ leafNames <- function(cellContainer){
     .redirect_prototypes(cell, containerEnv)
     .setHomeContext(cell, context)
     if(is.null(prototype)){ ## root
-        cellEnv <- as.environment(cell)
-        parent.env(cellEnv) <- get(".rootCellParentEnv", contextEnv)
+        parent.env(cell) <- get(".rootCellParentEnv", contextEnv)
     }else{
         ## Disregard the prototype if it's type already exists in the current container!!
         setPrototype(cell, containerEnv[[prot_type]])
@@ -319,10 +314,10 @@ that doesn't extend cell's default context class %s", class(.Object), class(home
 
 .initCells <- function(cells, where){
     "Install CELLS in the object WHERE"
-    ## cells must be a list,  names(cells) have precedence over internal type;
-    ##  'character' elements are looked up in the .cells environment,  if cannot
-    ##  find produce an error!! do not overwrite names in the program!
-    ##
+    ## cells must be a list,
+    ## names(cells) have precedence over internal type (treated in installBinding);
+    ## 'character' elements are looked up in the .cells environment,  if cannot
+    ## find produce an error!! Style note: do not overwrite type in the program!
     if(!is(where, "protoContext")) stop("Argument \"where\" must extend the class \"protoContext\"")
     if(is.list(cells)) {
         ## can have empty names, will be taken from type.
@@ -347,11 +342,9 @@ that doesn't extend cell's default context class %s", class(.Object), class(home
         .removeFromContainer(names = remCellNames, ".cells", where)
     }
     for(i in seq_along(cells)){
+        .cells <- get(".cells", envir = whereEnv)
         if(is.character(cells[[i]]))
-            ## install from inhereted contexts ## canot use 'new', it can not produce "*" cell
-            cells[[i]] <- .getPartial(cells[[i]],
-                                      get(".cells", envir = whereEnv), object_name = "cell") # error if not found
-        ##names have precedence over types here (types should not be used explicitly at user level)
+            cells[[i]] <- .getPartial(cells[[i]], .cells, object_name = "cell") # error if not found
         installBinding(cells[[i]], whereEnv[[".cells"]], cellTypes[[i]])
     }
     invisible(cellTypes)

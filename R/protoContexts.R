@@ -43,7 +43,11 @@ setMethod("show", signature(object = "protoContext"),
               cell_names <- ls(objEnv[[".cells"]], all.names = TRUE)
               rev_names <- strsplit(cell_names, ".", fixed = TRUE)
               rev_names <- sapply(rev_names, function(el) paste(rev(el), collapse = "."))
-              print(data.frame(` ` = cell_names[order(rev_names)], check.names = FALSE))
+              cell_names <- cell_names[order(rev_names)]
+              print(data.frame(` ` = cell_names,  
+                               ` ` = sapply(cell_names, USE.NAMES = F, 
+                                 function(nm) format(as.environment(get(nm, objEnv[[".cells"]])))),
+                               check.names = FALSE))
               cat("\n")
           })
 
