@@ -248,11 +248,12 @@ setClass("protoFormDefinition",
                 get(bindName, envir = whereEnv)
             else new("protoForm")
         stopifnot(is(newForm, "protoForm"))
-        for(i in seq_along(firstNames)){
-            if(!is.null(newForm[[firstNames[[i]]]]))
-                stop("subexpression `", firstNames[[i]], "` in form `", bindName,
-                     "` is already initialised. Use 'removeForm' first, or 'setForms' instead")
-        }
+        ## do not delete as yet:
+        ## for(i in seq_along(firstNames)){
+        ##     if(!is.null(newForm[[firstNames[[i]]]]))
+        ##         stop("subexpression `", firstNames[[i]], "` in form `", bindName,
+        ##              "` is already initialised. Use 'removeForm' first, or 'setForms' instead")
+        ## }
         for(i in seq_along(firstNames)){
             newForm[[firstNames[[i]]]] <-
                 ## if a form then install, if expression, just return
