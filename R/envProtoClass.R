@@ -99,6 +99,27 @@ setAs("environment", "envProtoClass", function(from){
 setMethod("show", signature(object = "envProtoClass"),
           function(object) print(object))
 
+.mix_in <- function(mixins, out_list){
+    ## mixins is a list of mixins (which are named lists of objects that must
+    ## be merged with cell parameters)
+    ## this functions merges all the list with name NAME from mixins into out_list
+    if(is(mixins, "protoMixin"))
+        mixins <- list(mixins)
+
+    name <- as.character(as.name(substitute(out_list)))
+    out <- c(unlist(lapply(mixins,
+                           function(mx){
+                               if(!(is(mx, "list")))
+                                   stop(sprintf("trying to mix in an object of class %s, whereas 'protoMixin' is required",
+                                                class(mx)))
+                               mx[[name]]
+                               }),
+                    recursive = F),
+             out_list)
+    nulls <- sapply(out, is.null)
+    out[!nulls]
+}
+
 ## setMethod("print", signature(x = "envProtoClass"),
 print.envProtoClass <- function(x, verbose = FALSE){
               object <- x
@@ -270,12 +291,14 @@ setMethod("initialize", signature(.Object = "protoContainer"),
 
 ###_ INITIALIZE
 ..eloadE1 <- expression({
+
     setMethod("initialize", signature(.Object = "envProtoClass"),
               function(.Object,
                        prototype = newRoot("envProtoClass"), ## tothink: what a heck is this here?
                        type = "--",
                        initMethods = list(), initFields = list(), initForms = list(),
                        setMethods = list(), setFields = list(), setForms = list(),
+                       mixins = list(), 
                        expr = expression(),
                        changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE), ...){
 
@@ -283,6 +306,10 @@ setMethod("initialize", signature(.Object = "protoContainer"),
 
                   ## !!!!! NO CLONING,  ALWAYS A NEW OBJECT !!!!!!!! ##
                   objEnv <- .Object@.xData <- new.env(TRUE)
+                  
+                  for(nm in c("initForms", "setForms", "initFields",
+                                "setFields", "initMethods", "setMethods", "expr"))
+                      eval(substitute(nm <- .mix_in(mixins, nm), list(nm = as.name(nm))))
 
                   ## BASIC VALIDATION:
                   if(!is(prototype, "envProtoClass")) # tothink: prototype should be from the same class as .Object??
@@ -290,7 +317,6 @@ setMethod("initialize", signature(.Object = "protoContainer"),
                   isValidProtoObject(prototype, trigger_error = TRUE)
                   parent.env(objEnv) <-
                       protoEnv <- as.environment(prototype)
-
 
                   ## SPECIALS
                   .insertSpecial(objEnv, self = .Object, prototype = prototype)
@@ -321,6 +347,7 @@ setMethod("initialize", signature(.Object = "protoContainer"),
                   eval(expr, envir = objEnv)
                   .Object
               })
+
 })
 
 
