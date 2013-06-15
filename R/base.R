@@ -182,6 +182,14 @@ newRoot <- function(Class, ...){
 isMirror <- function(obj)
     exists("._mirror", obj, inherits = F) && get("._mirror", obj)
 
+protoIs <- function(obj, class){
+    type <- .getType(obj)
+    if(grepl("\\*$", class))
+        grepl(paste0(".", class), type, fixed = TRUE)
+    else
+        grepl(paste0(sprintf("^%s\\.|\\.%s\\.", class, class)), type)
+}
+ 
 areIdentical <- function(c1, c2){
     ##  comapre two envProtoObjects
     reserved <- c( ".fields", ".forms", ".homeContext", ".methods", ".prototype", ".self",  ".cells", ".protozize", ".PROTOZIZE", "e")
