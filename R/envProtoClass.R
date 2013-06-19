@@ -99,26 +99,6 @@ setAs("environment", "envProtoClass", function(from){
 setMethod("show", signature(object = "envProtoClass"),
           function(object) print(object))
 
-.mix_in <- function(mixins, out_list){
-    ## mixins is a list of mixins (which are named lists of objects that must
-    ## be merged with cell parameters)
-    ## this functions merges all the list with name NAME from mixins into out_list
-    if(is(mixins, "protoMixin"))
-        mixins <- list(mixins)
-
-    name <- as.character(as.name(substitute(out_list)))
-    out <- c(unlist(lapply(mixins,
-                           function(mx){
-                               if(!(is(mx, "list")))
-                                   stop(sprintf("trying to mix in an object of class %s, whereas 'protoMixin' is required",
-                                                class(mx)))
-                               mx[[name]]
-                               }),
-                    recursive = F),
-             out_list)
-    nulls <- sapply(out, is.null)
-    out[!nulls]
-}
 
 ## setMethod("print", signature(x = "envProtoClass"),
 print.envProtoClass <- function(x, verbose = FALSE){
@@ -455,10 +435,10 @@ setMethod("initializeRoot", "envProtoClass",
                     protoClasses:::.generic_setter(dots, .self, ".forms")
                 },
                 debug = function(..., .methods, .fields, .forms){
-                    .debugObjects(list(...), .methods = c(), .fields = c(), .forms = c(), .where = .self)
+                    protoClasses:::.debugObjects(list(...), .methods = c(), .fields = c(), .forms = c(), .where = .self)
                 }, 
                 undebug = function(..., .methods = c(), .fields = c(), .forms = c(), .where = .self){
-                    .undebugObjects(list(...), .methods, .fields, .forms, .where = .self)
+                    protoClasses:::.undebugObjects(list(...), .methods, .fields, .forms, .where = .self)
                 },
                 inspect = function(){
                     eval(substitute({browser(skipCalls = 2);browser(skipCalls = 2)}), envir = .self)

@@ -16,6 +16,7 @@ Depends: R (>= 3.0.0), methods
 BugReports: https://github.com/vitoshka/protoClasses/issues
 Collate:
   "base.R"
+  "mixins.R"
   "envProtoClass.R"
   "protoFields.R"
   "protoForms.R"
