@@ -5,14 +5,16 @@
 ## now.
 
 setClass("protoMixin",
-         c(mixins = "list"), 
+         c(mixins = "list", subtype = "character"), 
          contains = "namedList")
 
-mixin <- function(..., parent_mixins = list()){
-    good <- sapply(parent_mixins, function(m) is(m, "mixins") || is.name(m))
+mixin <- function(..., parent_mixins = list(), subtype = character()){
+    if(is(parent_mixins, "protoMixin"))
+        parent_mixins <- list(parent_mixins)
+    good <- sapply(parent_mixins, function(m) is(m, "protoMixin") || is.name(m))
     if(any(!good))
         stop("arguments 'mixins' should contain only mixins or symbols")
-    new("protoMixin", list(...), mixins = parent_mixins)
+    new("protoMixin", list(...), mixins = parent_mixins, subtype = subtype)
 }
 
 .mix_in <- function(mixins, out_list = list(), name = NULL){
@@ -43,4 +45,15 @@ mixin <- function(..., parent_mixins = list()){
              out_list)
     nulls <- sapply(out, is.null)
     out[!nulls]
+}
+
+.get_subtypes <- function(mixins){
+    if(is(mixins, "protoMixin"))
+        mixins <- list(mixins)
+    
+    unlist(lapply(mixins,
+                  function(x)
+                  if(is(x, "protoMixin")){
+                      c(x@subtype, .get_subtypes(x@mixins))
+                  }))
 }

@@ -13,7 +13,11 @@
             if(base_only) Recall(x[[".prototype"]])
             else c(x[[".type"]], Recall(x[[".prototype"]]))
         else if(isRoot(x) || !fullName) x[[".type"]]
-        else c(x[[".type"]], Recall(x[[".prototype"]]))
+        else c(if(length(x[[".subtypes"]]) > 0)
+               paste0(x[[".type"]],
+                      paste0("(", x[[".subtypes"]],")", collapse = ""))
+               else x[[".type"]], 
+               Recall(x[[".prototype"]]))
     }
     if(is.character(collapse)) paste(type_local(object), collapse = collapse)
     else type_local(object)
@@ -291,6 +295,8 @@ setMethod("initialize", signature(.Object = "protoContainer"),
                                 "setFields", "initMethods", "setMethods", "expr"))
                       eval(substitute(nm <- .mix_in(mixins, nm), list(nm = as.name(nm))))
 
+                  assign(".subtypes", .get_subtypes(mixins), objEnv)
+
                   ## BASIC VALIDATION:
                   if(!is(prototype, "envProtoClass")) # tothink: prototype should be from the same class as .Object??
                       stop("Class of prototype argument must extend \"envProtoClass\".\n Got an object of class \"", class(prototype), "\"")
@@ -324,7 +330,11 @@ setMethod("initialize", signature(.Object = "protoContainer"),
                       .generic_setter(setMethods, .Object, ".methods")
                   if(length(setForms))
                       .generic_setter(setForms, .Object, ".forms")
-                  eval(expr, envir = objEnv)
+                  if(is.list(expr)) # when mixins are given
+                      for(e in expr)
+                          eval(e, envir = objEnv)
+                  else
+                      eval(expr, envir = objEnv)
                   .Object
               })
 
@@ -337,6 +347,7 @@ setMethod("initializeRoot", "envProtoClass",
                    initFields = list(),
                    initMethods = list(),
                    type = "*",
+                   
                    ...){ #... not used here pu
               ## initialize the basic functionality for the ROOT object
               ## .fields, .prototype, basic methods etc
@@ -382,6 +393,7 @@ setMethod("initializeRoot", "envProtoClass",
                           where = objEnv)
               
               .setField(objEnv, "type", type)
+              assign(".subtypes", character(), objEnv)
 
               ## BASIC METHODS
               .initMethods(list(

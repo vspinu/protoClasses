@@ -187,7 +187,7 @@ protoIs <- function(obj, class){
     if(grepl("\\*$", class))
         grepl(paste0(".", class), type, fixed = TRUE)
     else
-        grepl(paste0(sprintf("^%s\\.|\\.%s\\.", class, class)), type)
+        grepl(paste0(sprintf("^%s\\.|\\.%s\\.|\\(%s\\)", class, class, class)), type)
 }
  
 areIdentical <- function(c1, c2){
