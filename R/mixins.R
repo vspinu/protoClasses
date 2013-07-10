@@ -8,16 +8,16 @@ setClass("protoMixin",
          c(mixins = "list", subtype = "character"), 
          contains = "namedList")
 
-mixin <- function(..., parent_mixins = list(), subtype = character()){
-    if(is(parent_mixins, "protoMixin"))
-        parent_mixins <- list(parent_mixins)
-    good <- sapply(parent_mixins, function(m) is(m, "protoMixin") || is.name(m))
+mixin <- function(..., parentMixins = list(), subtype = character()){
+    if(is(parentMixins, "protoMixin"))
+        parentMixins <- list(parentMixins)
+    good <- sapply(parentMixins, function(m) is(m, "protoMixin") || is.name(m))
     if(any(!good))
         stop("arguments 'mixins' should contain only mixins or symbols")
-    new("protoMixin", list(...), mixins = parent_mixins, subtype = subtype)
+    new("protoMixin", list(...), mixins = parentMixins, subtype = subtype)
 }
 
-.mix_in <- function(mixins, out_list = list(), name = NULL){
+.mix_in_1 <- function(mixins, out_list = list(), name = NULL){
     ## Merge all the list with name NAME from mixins into out_list
     ## mixins is a list of mixins or a mixin;
     if(length(mixins) == 0L)
@@ -39,13 +39,49 @@ mixin <- function(..., parent_mixins = list(), subtype = character()){
                        stop(sprintf("trying to mix in an object of class %s, whereas 'protoMixin' is required",
                                     class(mx)))
                    ## recursively call on parent mixins
-                   c(.mix_in(mx@mixins, name = name), mx[[name]])
+                   c(.mix_in_1(mx@mixins, name = name), mx[[name]])
                }),
         recursive = F),
              out_list)
     nulls <- sapply(out, is.null)
     out[!nulls]
 }
+
+.mixin <- function(mixins, .Object, initMethods = list(),
+                   initFields = list(), initForms = list(), setMethods = list(),
+                   setFields = list(), setForms = list(), expr = list()){
+
+    for(nm in c("initForms", "setForms", "initFields",
+                "setFields", "initMethods", "setMethods", "expr"))
+        eval(substitute(nm <- .mix_in_1(mixins, nm), list(nm = as.name(nm))))
+
+    assign(".subtypes",
+           c(.get_subtypes(mixins), get(".subtypes", .Object)),
+             .Object)
+
+    .initFields(initFields, .Object)
+    .initMethods(initMethods, .Object)
+    .initForms(initForms, .Object)
+    
+    if(length(setFields))
+        .generic_setter(setFields, .Object, ".fields")
+    if(length(setMethods))
+        .generic_setter(setMethods, .Object, ".methods")
+    if(length(setForms))
+        .generic_setter(setForms, .Object, ".forms")
+
+    ## fixme: this sucks, prototype at this point the object in default context,
+    ## not the newlly instantiated cell in the container. Thus rootParentEnv is
+    ## not accessible. It looks like the only way to solve it is to catch expr
+    ## in initialize of protoCell, then BCell etc ... bad bad bad
+    if(is.list(expr)) 
+        for(e in expr)
+            eval(e, envir = .Object)
+    else
+        eval(expr, envir = .Object)
+    invisible(NULL)
+}
+    
 
 .get_subtypes <- function(mixins){
     if(is(mixins, "protoMixin"))

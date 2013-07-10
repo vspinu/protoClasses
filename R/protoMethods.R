@@ -17,7 +17,6 @@ setMethod("$", signature(x = "methodContainer"),
           .dollarGet_methodContainer <- function(x, name){
               meth <- get(name, envir = x)
               environment(meth) <- x@host
-              if(meth@changeCallEnv) meth <- x@host[[".PROTOZIZE"]](meth)
               meth
           })
 

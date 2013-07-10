@@ -203,31 +203,41 @@ setClass("protoFormDefinition",
 
 .installBinding_protoForm <- function(bindDefinition, container, bindName,
                                       after = NULL, returnBinding = bindName,
-                                      reinstal = FALSE){
-    ## * Used recursively:
-    ## if bindDefinition is a form - assign in the whereEnv and return e(...)
-    ## if bindDefinition is an expression - just return (as it is called recursively)
-    ## * main idea: an assigned form should have only calls like e(aa.bb.cc) or
-    ## simple expressions. No forms as children.
-    ## * If the form's name is like aa.bb.cc ,check for existence of aa.bb and aa
-    ## and install the eform e(aa.bb.cc) into aa.bb with the name "cc" and
-    ## e(aa.bb) into "aa" with the name "bb".
-    ## * If bindDefinition == NULL then this form ("aa.bb") and all the children forms
-    ## ("aa.bb.cc.dd" etc) are removed from CONTAINER
-    ## * if AFTER is nonnull it must be character or an integer specifying
-    ## the position of the new form "cc" in the parent form "aa.bb"
-
-    whereEnv <- as.environment(container@host)
+                                      no_new_forms = FALSE){
     form <- bindDefinition
+    
+    ## API: setForms assign a form aa.bb.cc only if that form is already installed
+    ## initForms assign all subforms whatever they are.
+    ## Both setForms and initForms re-assign aa.bb.cc if FORM is simple!
+
+    ## If FORM is complex (aka contains other forms) subforms are processed
+    ## recursively by initForms and appended to existing form.
+
+    ## Thus, assuming aa.bb and aa.cc exists, assignments like initForms(aa =
+    ## form(bb = form(blabla, pppri), cc = form(blabla, dd = form(ssss)))) will
+    ## insert aa.bb and aa.cc into aa, and will reset aa.bb but not aa.cc, which
+    ## will be appended with a subexpression A and form dd.
+    ##
+    ## When a preexisting form aa.cc is simple, initForm(aa.cc = form(dd =
+    ## form(bla))) appends to it. This is a useful thing.
+    ## 
+    ## Thus, somewhat confusing situation can occur only when mixed forms are
+    ## assigned. TOTHINK: force form() to accept only uniform forms? either
+    ## form-like or expression-like?
+    
+    ## this function is called by setForms with no_new_forms = TRUE
+    whereEnv <- as.environment(container@host)
 
     ## bindName is aa.bb.cc
     rec_names <- unlist(strsplit(bindName, split = ".",  ## "aa" "bb" "cc"
                                  fixed = TRUE), use.names=FALSE)
     cum_names <- Reduce(function(x, y) ## "aa.bb.cc" "aa.bb"    "aa"
                         c(paste(x[[1]], y, sep = "."), x), rec_names)
-    if(is.null(form))
-        return(.removeFormWithChildren(bindName, whereEnv))
-
+    if(is.null(form)){
+        .removeFormWithChildren(bindName, whereEnv)
+        .assignSubForms(bindName, form(), whereEnv, force = TRUE)
+        return(invisible(NULL))
+    }
     if(is(form, "protoForm")){
         ## create parent forms (i.e. aa.bb, aa) if needed:
         assigned <- TRUE
@@ -243,17 +253,24 @@ setClass("protoFormDefinition",
         shortNames <- names(form) ## (dd, ff)
         firstNames <- gsub("\\..*", "", shortNames)
         longNames <- paste(bindName, shortNames, sep = ".") ## (aa.bb.cc.dd, aa.bb.cc.ff)
+
+        ## forms ocntaining only expressions completely overwrite the form
+        ## complex forms are appended to existing forms if any
+        is_complex <- any(sapply(form, is, "protoForm")) 
         newForm <-
-            if(!reinstal && exists(bindName, envir = whereEnv[[".forms"]]))
+            if(is_complex && exists(bindName, envir = whereEnv[[".forms"]]))
                 get(bindName, envir = whereEnv)
             else new("protoForm")
         stopifnot(is(newForm, "protoForm"))
-        ## do not delete as yet:
-        ## for(i in seq_along(firstNames)){
-        ##     if(!is.null(newForm[[firstNames[[i]]]]))
-        ##         stop("subexpression `", firstNames[[i]], "` in form `", bindName,
-        ##              "` is already initialised. Use 'removeForm' first, or 'setForms' instead")
-        ## }
+        ## if called by setForms:
+        if(no_new_forms){
+            for(i in seq_along(firstNames)) {
+                ## expressions are "leafs", so are passed through
+                if(is(form[[i]], "protoForm") &&
+                   (is.null(tf <- newForm[[firstNames[[i]]]]) || !isECall(tf))) # could be expression
+                    stop("subform `", firstNames[[i]], "` in form `", bindName,
+                         "` is not initialised. Use 'initForms' first.")
+            }}
         for(i in seq_along(firstNames)){
             newForm[[firstNames[[i]]]] <-
                 ## if a form then install, if expression, just return
@@ -261,16 +278,11 @@ setClass("protoFormDefinition",
                   form[[i]], container, longNames[[i]],
                   returnBinding = paste(bindName, firstNames[[i]], sep = "."))
         }
-        ## -------------------------------------------------------------- #
-        ## install newForm only if different                              #
-        ## if(exists(bindName, envir = get(".forms", envir = whereEnv))){ #
-        ##     oldForm <- get(bindName, envir = whereEnv)                 #
-        ## if(!identical(newForm, oldForm)){                              #
-        ## -------------------------------------------------------------- #
-        ## todo: get the followining into unit test somehow
+        
         if(exists(bindName, whereEnv) && 
            (ln <- length(setdiff(names(get(bindName, whereEnv)), names(newForm)))))                
-            warning("warning: ", ln, " subforms removed in '", bindName, "' form")
+            message(ln, " subform(s) removed from '", bindName,
+                    "' (", .getType(whereEnv[[".self"]]), ")")
         assign(bindName, newForm, envir = whereEnv)                                                
         .installBinding_default(new("protoFormDefinition", formClass = class(form)),
                                 container, bindName, ".forms")
@@ -324,9 +336,9 @@ setMethod("$", signature(x = "formContainer"),
 .dollarSet_formContainer <- function(x, name, value, error = TRUE, after = NULL){
     if(exists(name, envir = x) &&
        is(oldForm <- get(name, envir = x@host), "protoForm")){
-        is_eCall <- unlist(sapply(oldForm, isECall))
-        shortNames <- names(oldForm)
-        longNames <- paste(name, shortNames, sep = ".")
+        ## is_eCall <- unlist(sapply(oldForm, isECall))
+        ## shortNames <- names(oldForm)
+        ## longNames <- paste(name, shortNames, sep = ".")
         ##         lapply(seq_along(names(oldForm)[is_eCall]), function(nm){
         ##             ## shit!! FIXME:: TODO: does not work for complex forms
         ##             ## if use '!is(value[[nm]], "protoForm") && ' in check the protoForm
@@ -337,10 +349,7 @@ setMethod("$", signature(x = "formContainer"),
         ## Use \"initForms\" to install new forms.")
         ##         })
         value <- as(value, "protoForm")
-        if(!identical(oldForm@.Data, value@.Data)){
-            .removeFormWithChildren
-            .installBinding_protoForm(value, x, name, reinstal = TRUE)
-        }
+        .installBinding_protoForm(value, x, name, no_new_forms = TRUE)
         return(x)
     }else{
         if(error) stop("Object ", name,
@@ -398,14 +407,18 @@ If name is aa.bb, all the registered forms starting with aa.bb will
     .infoContainer(.get_all_names(.forms), object, ".fields")
 }
 
-.assignSubForms <- function(formName, form, where, register = TRUE, after = NULL){
-    " If oldForm with the name formName exists replace supbforms form FORM in oldForm,
-assign form with formName otherwise.
+.assignSubForms <- function(formName, form, where, register = TRUE,
+                            after = NULL, force = FALSE){
+
+    " If oldForm with the name formName exists replace supbforms of FORM in oldForm,
+ and assign form with formName otherwise. If FORCE is T, just assign FORM to formName in WHERE.
+
  If AFTER is NULL just replace the subforms from old form by new subforms (the default)
  if <= 0 - preppend, if => length(oldForm) append. No name checks.
  Don't assign if new form is identical to the installed one."
+    
     do_assign <- FALSE
-    if(exists(formName, envir = get(".forms", envir = where))){
+    if(!force && exists(formName, envir = get(".forms", envir = where))){
         ## adds forms to existing one
         oldForm <- get(formName, envir = where)
         if(!is.null(after)){

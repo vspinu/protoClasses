@@ -60,6 +60,8 @@ setMethod("clone", "envProtoClass",
               ## SPECIALS
               .insertSpecial(yEnv, self=y, prototype=prototype)
               yEnv[[".homeContext"]] <- xEnv[[".homeContext"]]
+              yEnv[[".subtypes"]] <- xEnv[[".subtypes"]]
+
               if(isRoot(x)){
                   ## yEnv[[".root"]] <- y
                   yEnv[[".prototype"]] <- NULL ## just in case

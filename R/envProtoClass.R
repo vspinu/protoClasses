@@ -1,11 +1,17 @@
 ###_ UTILS
 
-.getType <- function(object, fullName = T, collapse = ".", base_only = FALSE){
+.getType <- function(object, fullName = T, sep = ".", sep_subtype = "(",
+                     subtypes = TRUE, base_only = FALSE){
     if(is(object, "protoCellDefinition")) return(object[["type"]])
     if(is.null(object)) return("NULL")
     ## if(!is(object, "envProtoClass"))
     ##     stop("The 'object' argument must be of class 'protoCellDefinition' or 'envProtoClass',  suplied an object of class ",  class(object))
     object <- as.environment(object)
+    switch(sep_subtype,
+           "(" = {sep1 = "("; sep2 = ")"},
+           "{" = {sep1 = "{"; sep2 = "}"}, 
+           "[" = {sep1 = "["; sep2 = "]"},
+           {sep1 = sep_subtype; sep2 = sep_subtype})
     ## fixme: simplify these two similar cases
     type_local <- function(x){
         x <- as.environment(x)
@@ -13,13 +19,14 @@
             if(base_only) Recall(x[[".prototype"]])
             else c(x[[".type"]], Recall(x[[".prototype"]]))
         else if(isRoot(x) || !fullName) x[[".type"]]
-        else c(if(length(x[[".subtypes"]]) > 0)
-               paste0(x[[".type"]],
-                      paste0("(", x[[".subtypes"]],")", collapse = ""))
-               else x[[".type"]], 
-               Recall(x[[".prototype"]]))
+        else c(
+            if(subtypes && length(x[[".subtypes"]]) > 0)
+            paste0(x[[".type"]],
+                   paste0(sep1, x[[".subtypes"]], sep2, collapse = ""))
+            else x[[".type"]], 
+            Recall(x[[".prototype"]]))
     }
-    if(is.character(collapse)) paste(type_local(object), collapse = collapse)
+    if(is.character(sep)) paste(type_local(object), collapse = sep)
     else type_local(object)
 }
 
@@ -50,16 +57,17 @@
     objEnv[["e"]] <- e
     objEnv[[".protozize"]] <- .protozize
     environment(objEnv[[".protozize"]]) <- objEnv
-    objEnv[[".PROTOZIZE"]] <- .PROTOZIZE
-    environment(objEnv[[".PROTOZIZE"]]) <- objEnv
     ## objEnv[[".cloneExclude"]] <- c()
     ## objEnv[[".cloneFirst"]] <- list()
     ## objEnv[[".cloneLast"]] <- list()
     objEnv[[".self"]] <- self
     objEnv[[".prototype"]] <- prototype
-    
+
     env <- attr(getSrcref(get("e", objEnv)), "srcfile")
     env[["filename"]] <- paste0("proto:", .getType(objEnv))
+
+    ## not so special; should not be reset during clonning!
+    objEnv[[".subtypes"]] <- character()
 }
 
 isValidProtoObject <- function(object, trigger_error = FALSE, object_name = "Object"){
@@ -68,13 +76,13 @@ isValidProtoObject <- function(object, trigger_error = FALSE, object_name = "Obj
     ## this sucks:
     checks <-
         c(
-          `Empty environments are not allowed` = !identical(emptyenv(), as.environment(object)),
-          `.prototype object not found` = exists(".prototype", envir = as.environment(object), inherits = FALSE),
-          `.self object not found`  = exists(".self", envir = as.environment(object), inherits = FALSE),
-          `.fields object not found` = exists(".fields", envir = as.environment(object), inherits = FALSE),
-          `.methods object not found` = exists(".methods", envir = as.environment(object), inherits = FALSE),
-          `.forms object not found` = exists(".forms", envir = as.environment(object), inherits = FALSE)
-          )
+            `Empty environments are not allowed` = !identical(emptyenv(), as.environment(object)),
+            `.prototype object not found` = exists(".prototype", envir = as.environment(object), inherits = FALSE),
+            `.self object not found`  = exists(".self", envir = as.environment(object), inherits = FALSE),
+            `.fields object not found` = exists(".fields", envir = as.environment(object), inherits = FALSE),
+            `.methods object not found` = exists(".methods", envir = as.environment(object), inherits = FALSE),
+            `.forms object not found` = exists(".forms", envir = as.environment(object), inherits = FALSE)
+            )
     if(any(failed <- !checks)){
         if(trigger_error) stop(object_name, " is not a valid protoObject;",
                                "checks failed with the message(s) \n",
@@ -106,37 +114,37 @@ setMethod("show", signature(object = "envProtoClass"),
 
 ## setMethod("print", signature(x = "envProtoClass"),
 print.envProtoClass <- function(x, verbose = FALSE){
-              object <- x
-              cat("Proto Object of class \"", class(x),"\" ", format(as.environment(x)), "\n\n", sep = "")
-              ## Show the context in the future  here (todo)
-              objEnv <- as.environment(object)
-              cat(" Type: \"", .getType(object), "\"\n", sep = "")
-              cat(" Is Root: ", isRoot(object), "\n")
-              cat(" Is Mirror: ", isMirror(object), "\n")
-              VL <- 50
-              bar <- "\t--------------------------------  \n"
-              if(verbose){
-                  methods:::.printNames("All objects: ", ls(objEnv, all.names = TRUE))
-                  cat(" Containers:\n")
-                  cat(" \n+ Fields:", bar)
-                  str(.get_all_names_with_host(object[[".fields"]]), vec.len = VL)
-                  ## print(.infoContainer(.get_all_names(objEnv[[".fields"]]), objEnv, ".fields"))
-                  cat(" \n+ Methods:", bar)
-                  str(.get_all_names_with_host(object[[".methods"]]), vec.len = VL)
-                  ## print(.infoContainer(.get_all_names(objEnv[[".methods"]]), objEnv, ".methods"))
-                  cat(" \n+ Forms:", bar)
-                  str(.get_all_names_with_host(object[[".forms"]]), vec.len = VL)
-              }
-              ## for forms look in objEnv directly:
-              ## print(infoForms(objEnv))
-              ## str(list(Fields =  .get_all_names(objEnv[[".fields"]]),
-              ##          Methods = .get_all_names(objEnv[[".methods"]]),
-              ##          Forms = .get_all_names(objEnv[[".forms"]])),
-              ##     no.list = TRUE, vec.len = 20, give.head = FALSE)
-              ## methods:::.printNames("Fields: ", ls(objEnv[[".fields"]], all.names = TRUE))
-              ## methods:::.printNames("Methods: ", ls(objEnv[[".methods"]], all.names = TRUE))
-              ## methods:::.printNames("Forms: ", ls(objEnv[[".forms"]], all.names = TRUE))
-          }
+    object <- x
+    cat("Proto Object of class \"", class(x),"\" ", format(as.environment(x)), "\n\n", sep = "")
+    ## Show the context in the future  here (todo)
+    objEnv <- as.environment(object)
+    cat(" Type: \"", .getType(object), "\"\n", sep = "")
+    cat(" Is Root: ", isRoot(object), "\n")
+    cat(" Is Mirror: ", isMirror(object), "\n")
+    VL <- 50
+    bar <- "\t--------------------------------  \n"
+    if(verbose){
+        methods:::.printNames("All objects: ", ls(objEnv, all.names = TRUE))
+        cat(" Containers:\n")
+        cat(" \n+ Fields:", bar)
+        str(.get_all_names_with_host(object[[".fields"]]), vec.len = VL)
+        ## print(.infoContainer(.get_all_names(objEnv[[".fields"]]), objEnv, ".fields"))
+        cat(" \n+ Methods:", bar)
+        str(.get_all_names_with_host(object[[".methods"]]), vec.len = VL)
+        ## print(.infoContainer(.get_all_names(objEnv[[".methods"]]), objEnv, ".methods"))
+        cat(" \n+ Forms:", bar)
+        str(.get_all_names_with_host(object[[".forms"]]), vec.len = VL)
+    }
+    ## for forms look in objEnv directly:
+    ## print(infoForms(objEnv))
+    ## str(list(Fields =  .get_all_names(objEnv[[".fields"]]),
+    ##          Methods = .get_all_names(objEnv[[".methods"]]),
+    ##          Forms = .get_all_names(objEnv[[".forms"]])),
+    ##     no.list = TRUE, vec.len = 20, give.head = FALSE)
+    ## methods:::.printNames("Fields: ", ls(objEnv[[".fields"]], all.names = TRUE))
+    ## methods:::.printNames("Methods: ", ls(objEnv[[".methods"]], all.names = TRUE))
+    ## methods:::.printNames("Forms: ", ls(objEnv[[".forms"]], all.names = TRUE))
+}
 
 ##' Dollar accessors of envProtoClasses
 ##'
@@ -216,7 +224,7 @@ setMethod("allNames", c(x = "protoContainer"),
 ##               length(.get_all_names(x))
 ##           })
 
-          
+
 .get_all_names <- function(container, exclude_special = T){
     "Search recursively for names in 'container', returns all names."
     containerEnv <- as.environment(container)
@@ -291,12 +299,6 @@ setMethod("initialize", signature(.Object = "protoContainer"),
                   ## !!!!! NO CLONING,  ALWAYS A NEW OBJECT !!!!!!!! ##
                   objEnv <- .Object@.xData <- new.env(TRUE)
                   
-                  for(nm in c("initForms", "setForms", "initFields",
-                                "setFields", "initMethods", "setMethods", "expr"))
-                      eval(substitute(nm <- .mix_in(mixins, nm), list(nm = as.name(nm))))
-
-                  assign(".subtypes", .get_subtypes(mixins), objEnv)
-
                   ## BASIC VALIDATION:
                   if(!is(prototype, "envProtoClass")) # tothink: prototype should be from the same class as .Object??
                       stop("Class of prototype argument must extend \"envProtoClass\".\n Got an object of class \"", class(prototype), "\"")
@@ -306,7 +308,7 @@ setMethod("initialize", signature(.Object = "protoContainer"),
 
                   ## SPECIALS
                   .insertSpecial(objEnv, self = .Object, prototype = prototype)
-
+                  
                   ## FUNDAMENTAL CONTAINERS:
                   objEnv[[".fields"]] <- new("fieldContainer",  host = .Object)
                   objEnv[[".methods"]] <- new("methodContainer", host = .Object)
@@ -315,26 +317,11 @@ setMethod("initialize", signature(.Object = "protoContainer"),
                   ## DEFAULTS
                   .setField(.Object, "type", type) # type field was initialized  in the root
                   
-                  ## USER supplied INITS
-                  if(changeCallEnv){
-                      initFields <- eval(substitute(initFields), envir = objEnv)
-                      initMethods <- eval(substitute(initMethods), envir = objEnv)
-                      initForms <- eval(substitute(initForms), envir = objEnv)
-                  }
-                  .initFields(initFields, .Object)
-                  .initMethods(initMethods, .Object)
-                  .initForms(initForms, .Object)
-                  if(length(setFields))
-                      .generic_setter(setFields, .Object, ".fields")
-                  if(length(setMethods))
-                      .generic_setter(setMethods, .Object, ".methods")
-                  if(length(setForms))
-                      .generic_setter(setForms, .Object, ".forms")
-                  if(is.list(expr)) # when mixins are given
-                      for(e in expr)
-                          eval(e, envir = objEnv)
-                  else
-                      eval(expr, envir = objEnv)
+                  .mixin(mixins, .Object,  initMethods = initMethods,
+                         initFields = initFields, initForms = initForms,
+                         setMethods = setMethods, setFields = setFields,
+                         setForms = setForms, expr = expr)
+                  
                   .Object
               })
 
@@ -346,9 +333,7 @@ setMethod("initializeRoot", "envProtoClass",
                    initForms = list(),
                    initFields = list(),
                    initMethods = list(),
-                   type = "*",
-                   
-                   ...){ #... not used here pu
+                   type = "*", ...){
               ## initialize the basic functionality for the ROOT object
               ## .fields, .prototype, basic methods etc
               objEnv <- as.environment(.Object)
@@ -358,106 +343,113 @@ setMethod("initializeRoot", "envProtoClass",
               objEnv[[".fields"]] <- new("fieldContainer", host = .Object) ## emptyenv as parent by default
               objEnv[[".methods"]] <- new("methodContainer", host = .Object)
               objEnv[[".forms"]] <- new("formContainer", host = .Object)
+
               ## SPECIALS
               .insertSpecial(objEnv, self = .Object, prototype=NULL)
+
               ## objEnv[[".root"]] <- .Object
 
               ## BASIC FIELDS
               .initFields(list(type = protoField(
-                                 function(value){
-                                     if(missing(value))
-                                         .type
-                                     else{
-                                         if(grepl(".", value, fixed = TRUE)){
-                                             warning("\".\" was replaced with \"_\" in ", value)
-                                             value <- gsub(".", "_", value, fixed = TRUE)
-                                         }
-                                         assign(".type", value, .self)
-                                     }
-                                 }),
+                                   function(value){
+                                       if(missing(value))
+                                           .type
+                                       else{
+                                           if(grepl(".", value, fixed = TRUE)){
+                                               warning("\".\" was replaced with \"_\" in ", value)
+                                               value <- gsub(".", "_", value, fixed = TRUE)
+                                           }
+                                           assign(".type", value, .self)
+                                       }
+                                   }),
                                Type = protoField(
-                                 function(value){
-                                     if(missing(value))
-                                         protoClasses:::.getType(.self)
-                                     else stop("Cannot assign extended type.")
-                                 }),
+                                   function(value){
+                                       if(missing(value))
+                                           protoClasses:::.getType(.self)
+                                       else stop("Cannot assign extended type.")
+                                   }),
                                proto = protoField(
-                                 function(value){
-                                     if(missing(value))
-                                         .prototype
-                                     else stop("Cannot reasign prototype.")
-                                 }),
+                                   function(value){
+                                       if(missing(value))
+                                           .prototype
+                                       else stop("Cannot reasign prototype.")
+                                   }),
                                methods = protoContainerField(".methods"),
                                fields = protoContainerField(".fields"), 
                                forms = protoContainerField(".forms")), 
                           where = objEnv)
               
               .setField(objEnv, "type", type)
-              assign(".subtypes", character(), objEnv)
 
               ## BASIC METHODS
               .initMethods(list(
-                new =
-                function(type = "--", initMethods = list(),
-                         initFields = list(), initForms = list(),
-                         setMethods = list(), setFields = list(), setForms = list(),
-                         expr = expression()){
-                    new(class(.self), type = type, prototype = .self,
-                        initMethods = initMethods, setMethods = setMethods,
-                        initFields = initFields, setFields = setFields,
-                        initForms = initForms, setForms = setForms,
-                        expr = expr)
-                }, 
-                initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
-                    dots <-
-                        if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                        else  c(list(...), .list)
-                    protoClasses:::.initMethods(dots, .self)
-                },
-                setMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
-                    dots <-
-                        if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                        else c(list(...), .list)
-                    protoClasses:::.generic_setter(dots, .self, ".methods")
-                },
-                initFields = function(..., .list = list(), .classes = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)) {
-                    dots <-
-                        if(changeCallEnv){
-                            .classes <- eval(substitute(.classes), envir = .self)
-                            eval(substitute(c(list(...), .list)), envir = .self)
-                        }else  c(list(...), .list)
-                    protoClasses:::.initFields(dots, .self, .classes)
-                },
-                setFields = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
-                    dots <-
-                        if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                        else c(list(...), .list)
-                    protoClasses:::.generic_setter(dots, .self, ".fields")
-                },
-                initForms = function(..., .list = list(), after = NULL,  changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)) {
-                    dots <-
-                        if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                        else c(list(...), .list)
-                    protoClasses:::.initForms(dots, .self, after = after)
-                },
-                setForms = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
-                    dots <-
-                        if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
-                        else c(list(...), .list)
-                    protoClasses:::.generic_setter(dots, .self, ".forms")
-                },
-                debug = function(..., .methods, .fields, .forms){
-                    protoClasses:::.debugObjects(list(...), .methods = c(), .fields = c(), .forms = c(), .where = .self)
-                }, 
-                undebug = function(..., .methods = c(), .fields = c(), .forms = c(), .where = .self){
-                    protoClasses:::.undebugObjects(list(...), .methods, .fields, .forms, .where = .self)
-                },
-                inspect = function(){
-                    eval(substitute({browser(skipCalls = 2);browser(skipCalls = 2)}), envir = .self)
-                },
-                eval = function(expr) eval(expr, envir = .self),
-                evalq = function(expr) eval(substitute(expr), envir = .self)
-                ), where = objEnv)
+                  new =
+                  function(type = "--", initMethods = list(),
+                           initFields = list(), initForms = list(),
+                           setMethods = list(), setFields = list(), setForms = list(),
+                           expr = expression()){
+                      new(class(.self), type = type, prototype = .self,
+                          initMethods = initMethods, setMethods = setMethods,
+                          initFields = initFields, setFields = setFields,
+                          initForms = initForms, setForms = setForms,
+                          expr = expr)
+                  }, 
+                  initMethods = function(..., .list = list()){
+                      dots <-
+                          if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                          else c(list(...), .list)
+                      protoClasses:::.initMethods(dots, .self)
+                  },
+                  setMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
+                      dots <-
+                          if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                          else c(list(...), .list)
+                      protoClasses:::.generic_setter(dots, .self, ".methods")
+                  },
+                  initFields = function(..., .list = list(), .classes = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)) {
+                      dots <-
+                          if(changeCallEnv){
+                              .classes <- eval(substitute(.classes), envir = .self)
+                              eval(substitute(c(list(...), .list)), envir = .self)
+                          }else  c(list(...), .list)
+                      protoClasses:::.initFields(dots, .self, .classes)
+                  },
+                  setFields = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
+                      dots <-
+                          if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                          else c(list(...), .list)
+                      protoClasses:::.generic_setter(dots, .self, ".fields")
+                  },
+                  initForms = function(..., .list = list(), after = NULL,  changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)) {
+                      dots <-
+                          if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                          else c(list(...), .list)
+                      protoClasses:::.initForms(dots, .self, after = after)
+                  },
+                  setForms = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
+                      dots <-
+                          if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                          else c(list(...), .list)
+                      protoClasses:::.generic_setter(dots, .self, ".forms")
+                  },
+                  mixin = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
+                      dots <-
+                          if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
+                          else c(list(...), .list)
+                      protoClasses:::.mixin(dots, .self)
+                  },
+                  debug = function(..., .methods, .fields, .forms){
+                      protoClasses:::.debugObjects(list(...), .methods = c(), .fields = c(), .forms = c(), .where = .self)
+                  }, 
+                  undebug = function(..., .methods = c(), .fields = c(), .forms = c(), .where = .self){
+                      protoClasses:::.undebugObjects(list(...), .methods, .fields, .forms, .where = .self)
+                  },
+                  inspect = function(){
+                      eval(substitute({browser(skipCalls = 2);browser(skipCalls = 2)}), envir = .self)
+                  },
+                  eval = function(expr) eval(expr, envir = .self),
+                  evalq = function(expr) eval(substitute(expr), envir = .self)
+                  ), where = objEnv)
               
               ## "USER" FIELDS:
               .initFields(initFields, .Object)

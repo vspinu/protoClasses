@@ -105,7 +105,7 @@ setClass("cellContainer",
          contains = "protoContainer")
 
 setMethod("$", signature(x = "cellContainer"),
-          function(x, name) .getPartial(name, x))
+          function(x, name) .getCell(name, x))
 
 leafNames <- function(cellContainer){
     "return leaf cells names from the container"
@@ -120,9 +120,27 @@ leafNames <- function(cellContainer){
     names(allC)[!allC %in% c(protC, "NULL")]
 }
 
-.getCell <- function(name, selfEnv){
+.get_all_names.cellContainer <- function(x){
+    all_names <- .get_all_names(x)
+    out <- c(all_names,
+             gsub("\\([^.]+\\)", "", all_names),
+             gsub("[()]", ".", all_names))
+    names(out) <- rep.int(all_names, 3L)
+    out
+}
+
+.getCell <- function(name, selfEnv, trigger_error = FALSE){
     .cells <- as.environment(selfEnv[[".cells"]])
-    .getPartial(name, .cells, trigger_error = FALSE)
+    name <- gsub("([.*])", "\\\\\\1", name)
+    if(!grepl("[.*]$", name))
+        name <- paste0(name, "\\.")
+    all_names <- .get_all_names.cellContainer(.cells)
+    match <- grep(paste0("^", name), all_names)
+    if(length(match) > 0)
+        get(names(all_names)[match[[1L]]], .cells)
+    else if(trigger_error)
+        stop(sprintf("prototype with partial name %s was not found", name))
+    else NULL
 }
 
 .setCell <- function(x, name, value, error = TRUE){
@@ -287,14 +305,11 @@ setCellClass <- function(Class,
                   if(!is(context, tCls <- getClassDef(class(.Object))@contextClass))
                       stop(gettextf("Attempt to create an object of class %s in a homeContext of class %s
 that doesn't extend cell's default context class %s", class(.Object), class(homeContext), tCls))
-
                   
                   ## PROTOTYPE
-                  .cells <- as.environment(get(".cells", context))
                   if(is.character(prototype)){
                       ## prototype is taken from the default context
-                      prototype <- .getPartial(prototype, container = .cells,
-                                               trigger_error = TRUE, object_name = "prototype")
+                      prototype <- .getCell(prototype, context, trigger_error = TRUE)
                   }
 
                   isValidProtoObject(prototype, trigger_error = TRUE, object_name = "prototype")
@@ -302,7 +317,7 @@ that doesn't extend cell's default context class %s", class(.Object), class(home
                   type <- as.character(type)
 
                   ## CREATE THE CELL
-                  .Object <- callNextMethod(.Object, type = type, prototype = prototype,  ...)
+                  .Object <- callNextMethod(.Object, type = type, prototype = prototype,  ...) 
 
                   ## Special OBJECTS:
                   objEnv <- as.environment(.Object)
@@ -327,7 +342,8 @@ that doesn't extend cell's default context class %s", class(.Object), class(home
                        is(el, "protoCell") ||
                        is(el, "protoCellDefinition") ||
                        is(el, "character")))) ## must be one of existing cells! don't create a new cell!!
-            stop("Argument for initCells must be of class  \"protoCell\" , \"protoCellDefinition\" or \"character\" vector of existing types")
+            stop("Argument for initCells must be of class  \"protoCell\" , \"protoCellDefinition\" or \"character\" vector of existing types.
+  Supplied an object of class '", class(el), "'")
     }
     else
         stop(gettextf("cells arguement must must be a list got an object of class \"%s\"",
@@ -342,9 +358,8 @@ that doesn't extend cell's default context class %s", class(.Object), class(home
         .removeFromContainer(names = remCellNames, ".cells", where)
     }
     for(i in seq_along(cells)){
-        .cells <- get(".cells", envir = whereEnv)
         if(is.character(cells[[i]]))
-            cells[[i]] <- .getPartial(cells[[i]], .cells, object_name = "cell") # error if not found
+            cells[[i]] <- .getCell(cells[[i]], whereEnv, trigger_error = TRUE)
         installBinding(cells[[i]], whereEnv[[".cells"]], cellTypes[[i]])
     }
     invisible(cellTypes)

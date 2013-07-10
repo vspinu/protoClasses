@@ -183,16 +183,22 @@ isMirror <- function(obj)
     exists("._mirror", obj, inherits = F) && get("._mirror", obj)
 
 protoIs <- function(obj, class){
-    type <- .getType(obj)
-    if(grepl("\\*$", class))
-        grepl(paste0(".", class), type, fixed = TRUE)
-    else
-        grepl(paste0(sprintf("^%s\\.|\\.%s\\.|\\(%s\\)", class, class, class)), type)
+    type <- .getType(obj, subtypes = FALSE)
+    long_type <- .getType(obj, sep_subtype = ".")
+    if(grepl("\\*$", class)){
+        reg <- paste0(".", class) 
+        grepl(reg, long_type, fixed = TRUE) ||
+            grepl(reg, type, fixed = TRUE)
+    }else{
+        reg <- paste0(sprintf("^%s\\.|\\.%s\\.|\\(%s\\)", class, class, class))
+        grepl(reg, long_type) ||
+            grepl(reg, type)
+    }
 }
  
 areIdentical <- function(c1, c2){
     ##  comapre two envProtoObjects
-    reserved <- c( ".fields", ".forms", ".homeContext", ".methods", ".prototype", ".self",  ".cells", ".protozize", ".PROTOZIZE", "e")
+    reserved <- c( ".fields", ".forms", ".homeContext", ".methods", ".prototype", ".self",  ".cells", ".protozize", "e")
     names1 <- ls(c1, all.names =  T)
     names2 <- ls(c2, all.names =  T)
     if(length(diff1 <- setdiff(setdiff(names1, names2), reserved)))
@@ -223,7 +229,6 @@ areIdentical <- function(c1, c2){
 .signAsRoot <- function(envProtoObj)
     assign(.rootMetaName, TRUE, envir = as.environment(envProtoObj), inherits = FALSE)
 
-
 .complete_partial_name <- function(name, container){
     ## return the full name from the container
     ## NA if not found 0 if partial multiple match
@@ -243,31 +248,21 @@ Return NULL if trigger_error = FALSE and match not found."
     if(!trigger_error && (is.na(match)||match == 0L))
         return(NULL)
     if(is.na(match))
-        stop(gettextf("Can not find the %s with the (partial) name \"%s\"",
+        stop(gettextf("Can not find a %s with the (partial) name \"%s\"",
                       object_name, name))
     if(match == 0L)
-        stop(gettextf("The name \"%s\" does not match uniquely the %ss' names ",
+        stop(gettextf("The name \"%s\" does not match uniquely in %ss' names ",
                       name, object_name))
-    get(all_names[[match]], envir = container)
+    get(all_names[match], envir = container)
 }
 
 .removeFromContainer <- function(names, container, where){
     remove(list = names, envir = as.environment(where[[container]]))
 }
 
-.PROTOZIZE <- function(fun){
-    ## not working, , , tothink:
-    ## it'a a bulshit idea. Why do I need this? Forms are for this.
-    "Protozize the function FUN by changing it's environment and
- argument evaluation environment to .self"
-    mc <- match.call()
-    mc <- as.list(mc[[2]])[-1]
-    do.call(fun, mc, envir = as.environment(.self))
-}
-
-.protozize <- function(fun){
+.protozize <- function(fun, self = .self){
     "Protozize the function FUN by changing it's environment to .self"
-    environment(fun) <- .self
+    environment(fun) <- self
     fun
 }
 

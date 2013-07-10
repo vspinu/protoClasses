@@ -63,19 +63,23 @@ setMethod("$", signature(x = "protoContext"),
 ##' @rdname dollar
 setMethod("$<-", signature(x = "protoContext"),
           function(x, name, value){ # must follow dollar arguments, dont realy like this :(
-              .cells <- get(".cells", envir = x)
-              match <- .complete_partial_name(name, .cells)
-              if(is(value, "protoCell") && !(is.na(match) || match == 0L)){
-                  assign(match, value, envir = .cells)
+              if(is(value, "protoCell") && !is.null(ocell <- .getCell(name, x))){
+                  if((otype <- .getType(ocell)) != (ntype <- .getType(value)))
+                      stop("types missmatch. Trying to assign cell of type ", ntype, " as cell of type ", otype)
+                  assign(otype, value, envir = x[[".cells"]])
               }else{
+                  ## if(match)
+                  ##     warning("partially matched cell name ", name,
+                  ##             "but assignmnet if of incompatible class: ", class(x))
                   callNextMethod(x, name, value)
               }
               invisible(x)
           })
 
 .DollarNames.protoContext <- function(x, pattern = ""){
-    c(.DollarNames.envProtoClass(x, pattern),
-      .get_all_names(get(".cells", envir = x, inherits = F), exclude_special = F))
+    cell_names <- .get_all_names.cellContainer(get(".cells", envir = x, inherits = F))
+    cell_names <- unique(gsub("([^.]+\\.[^.]+).*", "\\1", cell_names)) ## trunkate to first two
+    c(.DollarNames.envProtoClass(x, pattern), cell_names)
 }
 ## registerS3method(".DollarNames", "protoContext", .DollarNames.protoContext)
 
@@ -84,7 +88,6 @@ setMethod("setPrototype", "protoContext",
               callNextMethod()
               parent.env(get(".cells", envir = protoObj)) <- parent.env(get(".cells", envir = prototype))
           })
-
 
 ##' Return TRUE is it's a default context
 ##'
@@ -153,6 +156,15 @@ setMethod("initializeRoot", "protoContext",
                            where = objEnv)
               
               .initFields(list(cells = protoContainerField(".cells"),
+                               root = protoField(function(X){
+                                   if(missing(X))
+                                       .getCell("*", .self, TRUE)
+                                   else
+                                       if(isRoot(X))
+                                           assign("*", .self[[".cells"]])
+                                       else stop("trying to assign non-root object of class, ",
+                                                 class(X), " into root cell")
+                               }), 
                                rootCellParentEnv = protoField(".rootCellParentEnv")), 
                           where = objEnv)
               objEnv[[".rootCellParentEnv"]] <- globalenv() # parent of the .rootCell
