@@ -107,20 +107,21 @@ setClass("cellContainer",
 setMethod("$", signature(x = "cellContainer"),
           function(x, name) .getCell(name, x))
 
-leafNames <- function(cellContainer){
+leafNames <- function(cellContainer, storage_names = TRUE){
     "return leaf cells names from the container"
     cont_env <- as.environment(cellContainer)
     allC <- unlist(eapply(cont_env, function(el)
                           format(as.environment(el))))
     protC <- unlist(eapply(cont_env, function(el)
-                           if(is.null(out <- get(".prototype", envir = el)))
-                           format(out)
-                           else
-                           format(as.environment(out))))
-    names(allC)[!allC %in% c(protC, "NULL")]
+                           if(is.null(out <- get(".prototype", envir = el))) "NULL"
+                           else format(as.environment(out))))
+    out <- names(allC)[!allC %in% c(protC, "NULL")]
+    if(storage_names) out
+    else sapply(out, function(nm) .getType(cellContainer[[nm]]))
 }
 
 .get_all_names.cellContainer <- function(x){
+    ## used in completion (.DollarNames)
     all_names <- .get_all_names(x)
     out <- c(all_names,
              gsub("\\([^.]+\\)", "", all_names),
@@ -131,16 +132,23 @@ leafNames <- function(cellContainer){
 
 .getCell <- function(name, selfEnv, trigger_error = FALSE){
     .cells <- as.environment(selfEnv[[".cells"]])
-    name <- gsub("([.*])", "\\\\\\1", name)
+    name <- gsub("([(.*)])", "\\\\\\1", name) ## replace ., *, ), (
     if(!grepl("[.*]$", name))
         name <- paste0(name, "\\.")
-    all_names <- .get_all_names.cellContainer(.cells)
+    all_names <- .get_all_names(.cells)
     match <- grep(paste0("^", name), all_names)
     if(length(match) > 0)
-        get(names(all_names)[match[[1L]]], .cells)
-    else if(trigger_error)
-        stop(sprintf("prototype with partial name %s was not found", name))
-    else NULL
+        get(all_names[match[[1L]]], .cells)
+    else{
+        altered <- c(gsub("\\([^.]+\\)", "", all_names), ## remove all (subname)
+                     gsub("[()]", ".", all_names)) ## subsstitute () with .
+        match <- grep(paste0("^", name), altered)
+        if(length(match) > 0)
+            get(rep.int(all_names, 2L)[match[[1L]]], .cells)
+        else if(trigger_error)
+            stop(sprintf("prototype with partial name %s was not found", name))
+        else NULL   
+    }
 }
 
 .setCell <- function(x, name, value, error = TRUE){
@@ -287,6 +295,10 @@ setCellClass <- function(Class,
                        type = "--",
                        prototype = "*",
                        homeContext = NULL,
+                       mixin = list(),
+                       initMethods = list(), initFields = list(), initForms = list(),
+                       setMethods = list(), setFields = list(), setForms = list(),
+                       expr = expression(), 
                        ## setFoo and initFoo are doen in envProtoClass next method
                        ...){
                   ## PROTOTYPE can be a character string or a valid envProtoObject
@@ -323,6 +335,12 @@ that doesn't extend cell's default context class %s", class(.Object), class(home
                   objEnv <- as.environment(.Object)
                   objEnv[[".homeContext"]] <- homeContext
                   objEnv[[".self"]] <- .Object
+
+                  ## only at the end
+                  .mixin(mixin, .Object,  initMethods = initMethods,
+                         initFields = initFields, initForms = initForms,
+                         setMethods = setMethods, setFields = setFields,
+                         setForms = setForms, expr = expr)
 
                   .Object
               })})

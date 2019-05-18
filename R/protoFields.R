@@ -63,19 +63,6 @@ setClass("fieldContainer",
          prototype = prototype(typeContainer = ".fields"),
          contains = "protoContainer")
 
-setMethod("installBinding", "protoField",
-          function(bindDefinition, container, bindName, ...){
-              ## assign if different
-              ## containerEnv <- get(container, envir = where)
-              ## if(exists(bindName, envir = containerEnv)){
-              ##     oldField <- get(bindName, envir = containerEnv)
-              ##     ## if(!identical(bindDefinition, oldField))
-              ##     ##     callNextMethod()
-              ##     ## ## else do nothing
-              ## }else{
-              callNextMethod()
-          })
-
 .dollarGet_fieldContainer <- function(x,name){
     field_fun <- get(name, envir = x)
     environment(field_fun) <- x@host
@@ -111,7 +98,7 @@ setMethod("specialNames", "fieldContainer",
 ##     exists(name, envir = selfEnv[[".fields"]])
 ## }
 
-.getField <- function(name, selfEnv, error = FALSE)
+.getField <- function(name, selfEnv)
     if(exists(name, envir = selfEnv[[".fields"]])){
         .dollarGet_fieldContainer(selfEnv[[".fields"]], name)
     }else{
@@ -239,12 +226,13 @@ setMethod("initialize", signature(.Object = "protoField"),
                 ## protoField is suplied; don't assign initial value in WHERE
                 new("protoField", fieldInits[[i]], bindName = fieldNames[[i]])
             }else{
-                if(!isVirtualClass(fieldClasses[[i]]))
+                if(!(isS4(fieldInits[[i]]) && isVirtualClass(fieldClasses[[i]])))
                     assign(fieldNames[[i]], fieldInits[[i]], envir = whereEnv)
                 new("protoField",
                     bindName = fieldNames[[i]],
                     className = fieldClasses[[i]])
             }
+        ## default method
         installBinding(field, whereEnv[[".fields"]], fieldNames[[i]])
     }
     invisible(fieldNames)

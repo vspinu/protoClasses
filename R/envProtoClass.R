@@ -36,8 +36,8 @@
         object[["type"]] <- type
     else if (is(object, "protoCell")){
         assign(".type", type, envir = object)
-        env <- attr(getSrcref(get("e", object)), "srcfile")
-        env[["filename"]] <- paste0("proto:", .getType(object))
+        ## env <- attr(getSrcref(get("e", object)), "srcfile")
+        ## env[["filename"]] <- paste0("proto:", .getType(object))
     }else
         stop("can not set the type for object of class \"", class(object), "\"")
     object
@@ -54,6 +54,9 @@
     e <- eval(substitute(function(expr, type = "--")
                          .Internal(eval(expr, envir, envir)), list(envir = objEnv)))
     environment(e) <- objEnv
+    attr(e, "srcref") <- protoClasses:::._cursrc
+    ## env <- attr(getSrcref(get("e", objEnv)), "srcfile")
+    ## env[["filename"]] <- paste0("proto:", .getType(objEnv))
     objEnv[["e"]] <- e
     objEnv[[".protozize"]] <- .protozize
     environment(objEnv[[".protozize"]]) <- objEnv
@@ -62,9 +65,6 @@
     ## objEnv[[".cloneLast"]] <- list()
     objEnv[[".self"]] <- self
     objEnv[[".prototype"]] <- prototype
-
-    env <- attr(getSrcref(get("e", objEnv)), "srcfile")
-    env[["filename"]] <- paste0("proto:", .getType(objEnv))
 
     ## not so special; should not be reset during clonning!
     objEnv[[".subtypes"]] <- character()
@@ -288,9 +288,9 @@ setMethod("initialize", signature(.Object = "protoContainer"),
               function(.Object,
                        prototype = newRoot("envProtoClass"), ## tothink: what a heck is this here?
                        type = "--",
+                       mixin = list(), 
                        initMethods = list(), initFields = list(), initForms = list(),
                        setMethods = list(), setFields = list(), setForms = list(),
-                       mixins = list(), 
                        expr = expression(),
                        changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE), ...){
 
@@ -317,7 +317,7 @@ setMethod("initialize", signature(.Object = "protoContainer"),
                   ## DEFAULTS
                   .setField(.Object, "type", type) # type field was initialized  in the root
                   
-                  .mixin(mixins, .Object,  initMethods = initMethods,
+                  .mixin(mixin, .Object,  initMethods = initMethods,
                          initFields = initFields, initForms = initForms,
                          setMethods = setMethods, setFields = setFields,
                          setForms = setForms, expr = expr)
@@ -394,7 +394,7 @@ setMethod("initializeRoot", "envProtoClass",
                           initForms = initForms, setForms = setForms,
                           expr = expr)
                   }, 
-                  initMethods = function(..., .list = list()){
+                  initMethods = function(..., .list = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)){
                       dots <-
                           if(changeCallEnv) eval(substitute(c(list(...), .list)), envir = .self)
                           else c(list(...), .list)
@@ -406,7 +406,8 @@ setMethod("initializeRoot", "envProtoClass",
                           else c(list(...), .list)
                       protoClasses:::.generic_setter(dots, .self, ".methods")
                   },
-                  initFields = function(..., .list = list(), .classes = list(), changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)) {
+                  initFields = function(..., .list = list(), .classes = list(),
+                      changeCallEnv = getOption("protoClasses.changeCallEnv", FALSE)) {
                       dots <-
                           if(changeCallEnv){
                               .classes <- eval(substitute(.classes), envir = .self)

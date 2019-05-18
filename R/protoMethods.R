@@ -6,6 +6,9 @@ setClass("protoMethod",
          prototype(container = ".methods"),
          contains = "protoFunction")
 
+protoMethod <- function(fun = function() NULL, doc = "", ...){
+    new("protoMethod", fun, doc = doc, ...)
+}
 
 
 ###_ CONTAINER
@@ -84,6 +87,7 @@ setMethod("specialNames", "methodContainer",
     ## install in container
     for(i in seq_along(methods)){
         method <- new("protoMethod", methods[[i]])
+        ## default method
         installBinding(method, whereEnv[[".methods"]], methodNames[[i]])
     }
     invisible(methodNames)

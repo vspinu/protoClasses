@@ -61,12 +61,13 @@ setMethod("$", signature(x = "protoContext"),
           })
 
 ##' @rdname dollar
-setMethod("$<-", signature(x = "protoContext"),
+setMethod("$<-", signature(x = "protoContext"), 
           function(x, name, value){ # must follow dollar arguments, dont realy like this :(
               if(is(value, "protoCell") && !is.null(ocell <- .getCell(name, x))){
                   if((otype <- .getType(ocell)) != (ntype <- .getType(value)))
                       stop("types missmatch. Trying to assign cell of type ", ntype, " as cell of type ", otype)
-                  assign(otype, value, envir = x[[".cells"]])
+                  ## don't assign! Type might be changed by mixins.
+                  ## assign(otype, value, envir = x[[".cells"]])
               }else{
                   ## if(match)
                   ##     warning("partially matched cell name ", name,

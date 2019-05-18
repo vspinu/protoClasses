@@ -11,7 +11,6 @@ setClass("protoFieldWithBrowser",
          contains = c("protoField", "protoObjectWithBrowser"))
 
 
-
 .debugObjects <- function(names, .methods = c(), .fields = c(), .forms = c(), .where){
     names <- unlist(names)
     for( nm in names)

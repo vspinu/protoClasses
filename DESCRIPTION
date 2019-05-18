@@ -9,7 +9,6 @@ Description: A contextual prototype programming paradigm for R. It takes the
              ideas of prototype object orientation and enriches them with
              contexts and forms.
 License: GPL 
-Collate: funcs.R classes.R
 LazyLoad: yes
 Suggests: graph, Rgraphvis, testthat
 Depends: R (>= 3.0.0), methods

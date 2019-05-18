@@ -14,6 +14,9 @@ mixin <- function(..., parentMixins = list(), subtype = character()){
     good <- sapply(parentMixins, function(m) is(m, "protoMixin") || is.name(m))
     if(any(!good))
         stop("arguments 'mixins' should contain only mixins or symbols")
+    dots <- list(...)
+    if(any(dups <- duplicated(names(dots))))
+        stop(sprintf("%s occurs multiple times.", names(dots)[dups][[1]]))
     new("protoMixin", list(...), mixins = parentMixins, subtype = subtype)
 }
 
@@ -51,6 +54,8 @@ mixin <- function(..., parentMixins = list(), subtype = character()){
                    initFields = list(), initForms = list(), setMethods = list(),
                    setFields = list(), setForms = list(), expr = list()){
 
+    ## fixme: type might be changed by subtypes but the cell assigned in the
+    ## container is still by old name :(
     for(nm in c("initForms", "setForms", "initFields",
                 "setFields", "initMethods", "setMethods", "expr"))
         eval(substitute(nm <- .mix_in_1(mixins, nm), list(nm = as.name(nm))))

@@ -23,6 +23,24 @@ NULL
 ## Do not rely on  objects methods (like $, methods, etc) (only func programming)
 
 
+### COMPAT
+.eval <- function (expr, envir = parent.frame(),
+                   enclos = if (is.list(envir) || is.pairlist(envir)) parent.frame() else baseenv()){
+    ## assignInMyNamespace("._cursrc", getSrcref(expr)) ## not working in 3.0.2
+    assignInNamespace("._cursrc", getSrcref(expr), "protoClasses")
+    ## on.exit(assignInMyNamespace("._cursrc", NULL))
+    .Internal(eval(expr, envir, enclos))
+}
+
+## environment(.eval) <- .BaseNamespaceEnv
+## unlockBinding("eval", .BaseNamespaceEnv)
+## assign("eval", .eval, envir = .BaseNamespaceEnv, inherits = FALSE)
+## assign("._cursrc", NULL, .BaseNamespaceEnv)
+## lockBinding("eval", .BaseNamespaceEnv)
+
+._cursrc <- NULL
+
+
 ###_ CLASSES
 setClass("protoFunction",
          representation(changeCallEnv = "logical",
@@ -33,12 +51,52 @@ setClass("protoFunction",
 
 ###_ METHODS:
 .installBinding_default <- function(bindDefinition, container, bindName, ...){
-    ## default methods just assigns the stuff in the container.
+    ## default methods just assigns the stuff in the container. If function,
+    ## change the environment to the container. Useful for nextMethod
+    ## functionality.
+    if(is.function(bindDefinition)) ## may be separate method for function?
+        environment(bindDefinition) <- container
     assign(bindName, bindDefinition, envir = container)
 }
+
 setGeneric("installBinding",
            def = function(bindDefinition, container, bindName, ...) standardGeneric("installBinding"),
            useAsDefault = .installBinding_default)
+
+nextProtoField <- function(name){
+    .self = get(".self", envir = parent.frame())
+    if(exists(name, envir = .self[[".fields"]]))
+        field <- get(name, .self[[".fields"]])
+    else
+        stop("No field '", name, "' was defined.")
+    
+    next_cont <- parent.env(environment(field))
+    
+    if(exists(name, envir = next_cont))
+        field <- get(name, next_cont)
+    else
+        stop("There is no next field '", name, "' found.")
+    environment(field) <- .self
+    field
+}
+
+nextProtoMethod <- function(name){
+    .self = get(".self", envir = parent.frame())
+    if(exists(name, envir = .self[[".methods"]]))
+        method <- get(name, .self[[".methods"]])
+    else
+        stop("No method '", name, "' was defined.")
+    
+    next_cont <- parent.env(environment(method))
+    
+    if(exists(name, envir = next_cont))
+        method <- get(name, next_cont)
+    else
+        stop("There is no next method '", name, "' found.")
+    environment(method) <- .self
+    method
+}
+
 
 setGeneric("initializeRoot",
            function(.Object, ...) standardGeneric("initializeRoot"))
@@ -96,7 +154,8 @@ setGeneric("specialNames", def = function(protoObject) standardGeneric("specialN
                setFUN(.self, nm, dots[[nm]]))
         invisible(names)
     }else{
-        stop("Supplied empty names to the setter (", container_name, ")")
+        stop(sprintf("Supplied empty names to the setter '%s' (in object '%s')",
+                     container_name, self[[".type"]]))
     }
 }
 
